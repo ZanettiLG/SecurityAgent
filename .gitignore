@@ -1,0 +1,30 @@
+# Node
+node_modules/
+dist/
+
+# IDE
+.vscode/
+.idea/
+
+# Env
+.env
+.env.local
+.env.production
+
+# Data
+data/
+recordings/
+*.db
+*.sqlite
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Config local
+config/secrets/
+*.secret
