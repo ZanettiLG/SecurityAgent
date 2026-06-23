@@ -92,7 +92,7 @@ goap:
 # ── LLM ──
 llm:
   provider: "ollama"
-  model: "llama3.2"
+  model: "minicpm-v4.6"
   api_key: ""
   base_url: "http://localhost:11434"
 
