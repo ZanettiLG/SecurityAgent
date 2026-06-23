@@ -23,11 +23,15 @@ export class VisionPipeline {
   /** Stores the previous frame's raw pixel buffer per camera for diffing */
   private previousFrames = new Map<string, Buffer>();
 
-  /** Minimum percentage of changed pixels to trigger motion (default 2%) */
-  private readonly motionThreshold = 0.02;
+/** Minimum percentage of changed pixels to trigger motion (default 1%) */
+  private readonly motionThreshold = 0.01;
 
   /** Downsample frames to this width for faster processing */
   private readonly compareWidth = 320;
+
+  /** Track diagnostics */
+  private diagCount = 0;
+  private diagLastLog = 0;
 
   constructor(
     private bus: EventBus,
@@ -43,16 +47,30 @@ export class VisionPipeline {
     const count = (this.frameCounts.get(frame.cameraId) ?? 0) + 1;
     this.frameCounts.set(frame.cameraId, count);
 
+    if (count === 1 || count % 60 === 0) {
+      logger.info({ cameraId: frame.cameraId, count, size: frame.data.length }, "Frame received");
+    }
+
     if (count % this.frameSkip !== 0) {
       return null;
     }
 
     try {
-      // Decode JPEG to raw RGBA pixels and resize for efficiency
-      const raw = await sharp(frame.data)
-        .resize(this.compareWidth, Math.round(this.compareWidth * (frame.height / frame.width)))
-        .raw()
-        .toBuffer({ resolveWithObject: true });
+      // Decode JPEG with retry — ffmpeg may be mid-write
+      let raw: { data: Buffer; info: { width: number; height: number; channels: number } };
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          raw = await sharp(frame.data)
+            .resize(this.compareWidth, Math.round(this.compareWidth * (frame.height / frame.width)))
+            .raw()
+            .toBuffer({ resolveWithObject: true });
+          break;
+        } catch (e: any) {
+          if (attempt === 2 || (!e.message?.includes("empty") && !e.message?.includes("premature"))) throw e;
+          await new Promise(r => setTimeout(r, 50)); // Espera ffmpeg terminar de escrever
+        }
+      }
+      raw = raw!;
 
       const currentPixels = raw.data;
       const prevPixels = this.previousFrames.get(frame.cameraId);
@@ -68,6 +86,13 @@ export class VisionPipeline {
       // Pixel-by-pixel difference
       const changedPixels = this.countChangedPixels(currentPixels, prevPixels);
       const changeRatio = changedPixels / currentPixels.length;
+
+      // Diagnóstico a cada ~30 frames processados
+      this.diagCount++;
+      if (this.diagCount - this.diagLastLog >= 30) {
+        this.diagLastLog = this.diagCount;
+        logger.info({ cameraId: frame.cameraId, changeRatio: (changeRatio * 100).toFixed(2) + "%", changedPixels }, "Vision diag");
+      }
 
       if (changeRatio < this.motionThreshold) {
         return null;
@@ -96,7 +121,7 @@ export class VisionPipeline {
       this.bus.publish("vision.event", event);
       return event;
     } catch (err) {
-      logger.error({ err, cameraId: frame.cameraId }, "Vision processing error");
+      logger.warn({ err, cameraId: frame.cameraId }, "Vision processing error");
       return null;
     }
   }
@@ -114,8 +139,8 @@ export class VisionPipeline {
       const dr = Math.abs(current[i]! - previous[i]!);
       const dg = Math.abs(current[i + 1]! - previous[i + 1]!);
       const db = Math.abs(current[i + 2]! - previous[i + 2]!);
-      // Each channel must differ by >= 10 (out of 255) to count
-      if (dr > 10 || dg > 10 || db > 10) {
+      // Each channel must differ by >= 5 (out of 255) to count (was 10)
+      if (dr > 5 || dg > 5 || db > 5) {
         changed++;
       }
     }

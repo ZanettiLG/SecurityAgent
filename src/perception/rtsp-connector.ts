@@ -12,11 +12,6 @@ import type { CameraConfig } from "../core/config.js";
 import { logger } from "../core/logger.js";
 import type { CameraConnector, CameraFrame } from "./camera-connector.js";
 
-// ── Constants ────────────────────────────────────────────────────
-
-const BOUNDARY = Buffer.from("--ffmpeg_boundary");
-const JPEG_SOI = Buffer.from([0xff, 0xd8]); // Start of Image marker
-
 // ── Helpers ──────────────────────────────────────────────────────
 
 function sleep(ms: number): Promise<void> {
@@ -34,7 +29,7 @@ export class RtspConnector implements CameraConnector {
 
   private _connected = false;
   private process: ChildProcess | null = null;
-  private readonly maxRetries = 3;
+  private readonly maxRetries = 30;  // Aguentar horas de monitoramento
   private fps: number;
   private width: number;
   private height: number;
@@ -62,12 +57,11 @@ export class RtspConnector implements CameraConnector {
 
   async disconnect(): Promise<void> {
     this._connected = false;
-    this._killProcess();
+    this._stopProcess();
     logger.info({ cameraId: this.cameraId }, "RTSP camera disconnected");
   }
 
   async getFrame(): Promise<CameraFrame | null> {
-    // Single-frame capture not supported for RTSP; use stream() instead.
     return null;
   }
 
@@ -79,21 +73,22 @@ export class RtspConnector implements CameraConnector {
     while (retries < this.maxRetries && this._connected) {
       try {
         yield* this._streamInternal();
-        retries = 0; // reset on clean exit
+        retries = 0;
       } catch (err) {
         retries++;
         logger.warn({ err, retries, cameraId: this.cameraId }, "RTSP stream error, reconnecting...");
-
-        this._killProcess();
+        this._stopProcess();
         await sleep(5000);
       }
     }
+  }
 
-    if (retries >= this.maxRetries) {
-      logger.error(
-        { cameraId: this.cameraId, maxRetries: this.maxRetries },
-        "RTSP max retries exceeded, giving up",
-      );
+  // ── Internals ──────────────────────────────────────────────
+
+  private _stopProcess(): void {
+    if (this.process) {
+      this.process.kill("SIGTERM");
+      this.process = null;
     }
   }
 
@@ -121,18 +116,21 @@ export class RtspConnector implements CameraConnector {
 
   private _startFfmpeg(): ChildProcess {
     const authUrl = this._buildAuthenticatedUrl();
+    // Escreve frames JPEG direto em arquivo (mais confiavel que MJPEG pipe no Windows)
+    const framePath = `data/cam_${this.cameraId}.jpg`;
     const args = [
       "-rtsp_transport", "tcp",
+      "-y",                    // Overwrite without prompting
       "-timeout", "3000000",
       "-i", authUrl,
-      "-f", "image2pipe",
-      "-vcodec", "mjpeg",
-      "-q:v", "2",
+      "-f", "image2",
       "-r", String(this.fps),
-      "-",
+      "-update", "1",
+      "-q:v", "2",
+      framePath,
     ];
 
-    logger.debug({ cameraId: this.cameraId, source: authUrl.replace(/:[^:@]+@/, ":****@") }, "Spawning ffmpeg");
+    logger.info({ cameraId: this.cameraId, framePath }, "Spawning ffmpeg (file mode)");
 
     const proc = spawn("ffmpeg", args, {
       stdio: ["ignore", "pipe", "pipe"],
@@ -156,56 +154,39 @@ export class RtspConnector implements CameraConnector {
     return proc;
   }
 
-  private _killProcess(): void {
-    if (this.process) {
-      this.process.kill("SIGTERM");
-      this.process = null;
-    }
-  }
-
+  // Remove old BOUNDARY/JPEG_SOI constants and use file polling instead
   private async *_streamInternal(): AsyncGenerator<CameraFrame> {
+    const framePath = `data/cam_${this.cameraId}.jpg`;
     const proc = this._startFfmpeg();
     this.process = proc;
 
-    let buffer = Buffer.alloc(0);
+    const { readFile, stat } = await import("node:fs/promises");
+    let lastSize = 0;
+    let lastMtime = 0;
 
-    for await (const chunk of proc.stdout!) {
-      if (!this._connected) break;
+    const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-      buffer = Buffer.concat([buffer, chunk]);
-
-      // Parse MJPEG frames delimited by BOUNDARY
-      let boundaryIdx: number;
-      while ((boundaryIdx = buffer.indexOf(BOUNDARY)) !== -1) {
-        // Find the next boundary to delimit this frame
-        const nextBoundary = buffer.indexOf(BOUNDARY, boundaryIdx + BOUNDARY.length);
-        if (nextBoundary === -1) break; // incomplete frame, wait for more data
-
-        const segment = buffer.subarray(boundaryIdx + BOUNDARY.length, nextBoundary);
-
-        // Locate JPEG Start-of-Image marker
-        const soiIdx = segment.indexOf(JPEG_SOI);
-        if (soiIdx === -1) {
-          buffer = buffer.subarray(nextBoundary);
-          continue; // no JPEG data in this segment
+    while (this._connected && proc.exitCode === null) {
+      try {
+        const s = await stat(framePath).catch(() => null);
+        if (!s || s.size < 500 || s.mtimeMs === lastMtime) {
+          await sleep(1000 / this.fps);
+          continue;
         }
 
-        const jpegData = segment.subarray(soiIdx);
-
-        logger.debug(
-          { cameraId: this.cameraId, size: jpegData.length },
-          "RTSP frame received",
-        );
+        lastSize = s.size;
+        lastMtime = s.mtimeMs;
+        const data = await readFile(framePath);
 
         yield {
           cameraId: this.cameraId,
           timestamp: new Date(),
-          data: jpegData,
+          data,
           width: this.width,
           height: this.height,
         };
-
-        buffer = buffer.subarray(nextBoundary);
+      } catch {
+        await sleep(1000 / this.fps);
       }
     }
 
