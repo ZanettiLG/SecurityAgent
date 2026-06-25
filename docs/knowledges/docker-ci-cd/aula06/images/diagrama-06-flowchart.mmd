@@ -1,0 +1,16 @@
+flowchart LR
+    subgraph EXTERNO["Externo"]
+        CLI["Cliente<br/>localhost:30080"]
+    end
+    subgraph CLUSTER["Cluster Kubernetes"]
+        SVC["Service (NodePort)<br/>api-service<br/>ClusterIP: 10.96.0.10"]
+        DNS["CoreDNS<br/>api-service.default.svc"]
+        POD1["Pod: api v1<br/>IP: 10.1.0.5"]
+        POD2["Pod: api v1<br/>IP: 10.1.0.6"]
+        POD3["Pod: api v2<br/>IP: 10.1.0.7"]
+    end
+    CLI -->|nodePort: 30080| SVC
+    DNS --> SVC
+    SVC -->|selector: app=minha-api| POD1
+    SVC --> POD2
+    SVC --> POD3

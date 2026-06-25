@@ -193,6 +193,7 @@ export class VehicleTracker {
             speedReduction,
             observingResidence,
             multiplePasses,
+            snapshotPath: `data/cam_${cameraId}.jpg`,
           },
         }),
       );
@@ -217,6 +218,7 @@ export class VehicleTracker {
               speedReduction,
               observingResidence,
               multiplePasses,
+              snapshotPath: `data/cam_${cameraId}.jpg`,
             },
           }),
         );

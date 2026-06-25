@@ -1,0 +1,11 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "type": "command",
+        "command": "node scripts/failure-detector.js && node scripts/prompt-refiner.js && node scripts/subagent-refiner.js && node scripts/skill-refiner.js && node scripts/memory-refiner.js && node scripts/check-quality-gates.js",
+        "timeout": 60
+      }
+    ]
+  }
+}

@@ -5,7 +5,7 @@
   "type": "module",
   "main": "dist/core/agent.js",
   "scripts": {
-    "dev": "tsx watch src/core/agent.ts",
+    "dev": "concurrently --names \"backend,dashboard\" --prefix-colors \"cyan,yellow\" \"tsx watch src/core/agent.ts\" \"cd dashboard && npm run dev\"",
     "build": "tsc",
     "start": "node dist/core/agent.js",
     "typecheck": "tsc --noEmit",
@@ -31,6 +31,7 @@
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.0.0",
     "@types/ws": "^8.18.1",
+    "concurrently": "^10.0.3",
     "eslint": "^9.0.0",
     "tsx": "^4.15.0",
     "typescript": "^5.5.0",

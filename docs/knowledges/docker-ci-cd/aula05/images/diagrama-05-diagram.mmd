@@ -1,0 +1,21 @@
+flowchart LR
+    subgraph Antes[Antes do Update]
+        A1[V1]
+        A2[V1]
+        A3[V1]
+        A4[V1]
+        A5[V1]
+    end
+    subgraph Durante[Durante o Update]
+        D1[V1] -.->|nova| D2[V2]
+        D3[V1]
+        D4[V1]
+        D5[V1]
+    end
+    subgraph Depois[Depois do Update]
+        P1[V2]
+        P2[V2]
+        P3[V2]
+        P4[V2]
+        P5[V2]
+    end

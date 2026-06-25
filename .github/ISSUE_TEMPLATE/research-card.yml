@@ -1,0 +1,97 @@
+name: 🔍 Research Card
+description: Agent handoff card — codebase exploration output (filled by researcher agent)
+title: "research: "
+labels: ["agent:research", "status:in-progress"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        > 📋 **Phase 1/3 — Research**. Filled by the `researcher` agent.
+        > This card is the ONLY context the `planner` receives. Keep it self-contained.
+
+  - type: input
+    id: epic_ref
+    attributes:
+      label: Parent Epic
+      placeholder: "#123"
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What problem does this solve? (from epic)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      multiple: true
+      options: ["backend-only", "frontend-only", "full-stack"]
+
+  - type: textarea
+    id: relevant_files
+    attributes:
+      label: Relevant Files
+      description: Files mapped during codebase exploration
+      value: |
+        | File | Path | Why it matters |
+        |---|---|---|
+        | | | |
+
+  - type: textarea
+    id: patterns
+    attributes:
+      label: Patterns to Follow
+      value: "- **Pattern** (`path/to/file.ts`): explanation"
+
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints
+      value: "- **constraint**: explanation"
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      value: |
+        | Dep | Type | Location | Status |
+        |---|---|---|---|
+        | | existing/new | `path` | available/needs/blocked |
+
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks
+      value: |
+        | Risk | Likelihood | Impact | Mitigation |
+        |---|---|---|---|
+        | | low/med/high | | |
+
+  - type: textarea
+    id: open_questions
+    attributes:
+      label: Open Questions
+      placeholder: "- [?] question that needs answer before planning"
+
+  - type: checkboxes
+    id: dod
+    attributes:
+      label: DoD → Planning
+      options:
+        - label: All files identified
+        - label: Patterns documented
+        - label: Constraints stated
+        - label: Dependencies mapped
+        - label: No blocking questions
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        ## 🤖 Handoff → Planner
+        **Receives:** Context, Files, Patterns, Constraints, Dependencies, Risks
+        **Does NOT receive:** Raw files, exploration logs, conversation
+        **Job:** Decompose into tasks. Do NOT re-explore.

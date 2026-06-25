@@ -1,0 +1,369 @@
+name: 🎯 Feature Epic
+description: Parent issue for a feature to be developed via the agent handoff pipeline
+title: "feat: "
+labels: ["type:epic"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        > 🤖 This epic will be processed through the **Agent Handoff Pipeline**: Research → Planning → Implementation.
+        > The orchestrator agent will create sub-issues for each phase. You can audit each card before the next phase runs.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Feature Description
+      description: What should this feature do? Be specific.
+      placeholder: |
+        As a [user], I want to [action] so that [outcome].
+        Example: As an audiobook creator, I want to preview individual narration segments before generating the full MP3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: List of verifiable conditions that define "done"
+      placeholder: |
+        - [ ] Given [context], when [action], then [expected result]
+        - [ ] The user can preview a narration segment without waiting for full generation
+        - [ ] Preview plays through the browser audio player
+        - [ ] Segment preview respects TTS concurrency limits
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      description: Which part of the monorepo does this touch?
+      multiple: true
+      options:
+        - backend
+        - frontend
+        - doc-converter-service
+        - e2e tests
+        - infrastructure (Docker/CI)
+    validations:
+      required: true
+
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints & Notes
+      description: Any known constraints, dependencies, or context the agents should consider
+      placeholder: |
+        - Must follow existing SSE streaming pattern (backend)
+        - Must use MUI v6 components (frontend)
+        - Must not break existing 330 test baseline
+        - Depends on PR #123 being merged first
+
+  - type: textarea
+    id: handoff_trigger
+    attributes:
+      label: 🤖 Handoff Trigger
+      description: Instructions for the orchestrator agent to start
+      value: |
+        /handoff start — begin research phase
+---
+name: 🔍 Research Card
+description: Agent handoff card for the Research phase — codebase exploration output
+title: "research: "
+labels: ["agent:research", "status:in-progress"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        > 📋 **Handoff Card — Research Phase**
+        > This card is the **ONLY context** the Planner receives. Keep it self-contained.
+        > After completing, set label to `status:needs-review`.
+
+  - type: input
+    id: epic
+    attributes:
+      label: Parent Epic
+      description: Reference to the parent epic issue
+      placeholder: "#123"
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What problem does this feature solve? (1-2 sentences from the epic)
+      placeholder: "The user needs to preview narration segments individually before committing to full MP3 generation."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope_assessment
+    attributes:
+      label: Scope Assessment
+      multiple: true
+      options:
+        - backend-only
+        - frontend-only
+        - full-stack
+
+  - type: textarea
+    id: relevant_files
+    attributes:
+      label: Relevant Files
+      description: Table of files mapped during codebase exploration
+      placeholder: |
+        | File | Path | Why it matters |
+        |---|---|---|
+        | Narration route | `backend/src/api/narration/route.ts` | Existing SSE streaming pattern to follow |
+        | Narration pipeline | `backend/src/pipeline/narration.pipeline.ts` | Concurrency model, TTS integration |
+        | Audio player | `frontend/components/player/AudioPlayer.tsx` | Component to extend with segment preview |
+      value: |
+        | File | Path | Why it matters |
+        |---|---|---|
+        | | | |
+
+  - type: textarea
+    id: patterns_to_follow
+    attributes:
+      label: Patterns to Follow
+      description: Documented patterns from the codebase to reuse
+      placeholder: |
+        - **SSE streaming** (`backend/src/api/narration/route.ts`): POST start → jobId → EventSource with progress/complete/error events
+        - **DI via req.deps** (`backend/src/api/projects/route.ts`): Access services through `req.deps.repositories.*`, never import directly
+      value: |
+        - **Pattern name** (seen in `path/to/file.ts`): [explanation]
+
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints Discovered
+      description: Technical constraints that the implementation must respect
+      placeholder: |
+        - **DI constraint**: New route must access TTS service via `req.deps.tts` — available through `src/deps/tts.dep.ts`
+        - **Concurrency**: TTS_CONCURRENCY env var limits simultaneous TTS calls
+        - **State machine**: Preview only valid in `narrating` or `narrated` project states
+      value: |
+        - **constraint name**: [explanation]
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: What needs to exist before implementation starts?
+      value: |
+        | Dependency | Type | Location | Status |
+        |---|---|---|---|
+        | | existing/new | `path` | available/needs-creation/blocked |
+
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks
+      description: What could go wrong?
+      value: |
+        | Risk | Likelihood | Impact | Mitigation |
+        |---|---|---|---|
+        | | low/med/high | | |
+
+  - type: textarea
+    id: open_questions
+    attributes:
+      label: Open Questions
+      description: Unresolved questions that need answers before planning
+      placeholder: |
+        - [?] Should segment preview use the same TTS provider or a faster provider?
+        - [?] Does MinIO have a bucket/prefix for temporary preview audio?
+
+  - type: checkboxes
+    id: dod
+    attributes:
+      label: Definition of Done for Planning
+      options:
+        - label: All relevant files identified and explored
+        - label: Patterns to follow documented with examples
+        - label: Constraints clearly stated
+        - label: Dependencies mapped (existing vs new)
+        - label: No open questions that block task decomposition
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        ## 🤖 Handoff Contract
+        > **To:** Planner agent
+        > **You receive:** Context, Relevant Files, Patterns, Constraints, Dependencies, Risks
+        > **You DO NOT receive:** Raw file contents, exploration logs, agent conversation
+        > **Your job:** Decompose into ordered, atomic tasks. Do NOT re-explore the codebase.
+---
+name: 🗂️ Planning Card
+description: Agent handoff card for the Planning phase — task decomposition
+title: "plan: "
+labels: ["agent:planning", "status:in-progress"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        > 📋 **Handoff Card — Planning Phase**
+        > This card is the **ONLY context** the Coder receives. Keep it actionable.
+        > After completing, set label to `status:needs-review`.
+
+  - type: input
+    id: research_card
+    attributes:
+      label: Research Card Reference
+      description: Link to the research sub-issue this plan is based on
+      placeholder: "#123"
+
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective
+      description: One sentence — what we're building
+      placeholder: "Add segment-level preview for narration, allowing users to generate and audition a single chapter before full book processing."
+    validations:
+      required: true
+
+  - type: textarea
+    id: architecture_notes
+    attributes:
+      label: Architecture Notes
+      description: Design decisions, layers touched, DI considerations
+      placeholder: |
+        - New endpoint in `/api/narration/preview` — uses existing pipeline but with single-chapter scope
+        - Frontend: new `PreviewPanel` component in `components/editor/`
+        - Uses existing DI: `req.deps.tts`, `req.deps.repositories.projects`
+        - No new MinIO bucket — temporary preview stored as temp file
+
+  - type: textarea
+    id: tasks
+    attributes:
+      label: Tasks (ordered by dependency)
+      description: Each task must be atomic — one thing, one commit
+      value: |
+        ### Task 1: [Name] (complexity: low/medium/high)
+        - **Files to create**:
+          - `path/to/file.ts` — [what this file does]
+        - **Files to edit**:
+          - `path/to/existing.ts` — [what changes]
+        - **Dependencies**: None / Task X
+        - **Conventions**: [specific AGENTS.md conventions]
+        - **Test strategy**: [unit/integration, what to test]
+
+        ### Task 2: [Name] (complexity: ...)
+        ...
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria (from epic)
+      description: Copied from the parent epic, possibly refined
+      placeholder: |
+        - [ ] Given a project in `narrated` state, when user requests segment preview, then preview audio is generated and playable
+        - [ ] Preview respects TTS concurrency limits
+
+  - type: checkboxes
+    id: dod
+    attributes:
+      label: Definition of Done for Implementation
+      options:
+        - label: All tasks completed
+        - label: Tests passing (baseline: 330 backend + 2 frontend)
+        - label: Lint 0 warnings + typecheck 0 errors
+        - label: Code review passed (0 critical issues)
+        - label: PR created with all tasks checked
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        ## 🤖 Handoff Contract
+        > **To:** Coder agent
+        > **You receive:** Objective, Architecture Notes, Tasks list, Acceptance Criteria
+        > **You DO NOT receive:** Research card, planning rationale, agent conversation
+        > **Your job:** Implement each task in order. One commit per task. Test each one.
+---
+name: ⚙️ Implementation Card
+description: Agent handoff card for the Implementation phase — code changes + review summary
+title: "impl: "
+labels: ["agent:implementation", "status:in-progress"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        > 📋 **Handoff Card — Implementation Phase**
+        > This card is the audit trail of what was actually built. The coder and code-reviewer update it.
+        > After completing all tasks + code review, set label to `status:needs-review`.
+
+  - type: input
+    id: planning_card
+    attributes:
+      label: Planning Card Reference
+      description: Link to the planning sub-issue this implementation is based on
+      placeholder: "#123"
+
+  - type: textarea
+    id: task_status
+    attributes:
+      label: Task Status
+      description: Check off each task from the planning card as it's completed
+      value: |
+        - [ ] Task 1: [Name] — pending
+        - [ ] Task 2: [Name] — pending
+
+  - type: textarea
+    id: files_changed
+    attributes:
+      label: Files Changed
+      description: Table of all files touched during implementation
+      value: |
+        | File | Action | Notes |
+        |---|---|---|
+        | `path/to/file.ts` | created | [what was done] |
+
+  - type: textarea
+    id: tests_added
+    attributes:
+      label: Tests Added
+      description: New or modified test files
+      value: |
+        | Test file | Tests | Coverage |
+        |---|---|---|
+        | `__tests__/feature.test.ts` | N tests | [scenarios covered] |
+
+  - type: textarea
+    id: code_review_summary
+    attributes:
+      label: Code Review Summary
+      description: Populated by the code-reviewer agent
+      value: |
+        - 🔴 Critical: 0 issues
+        - 🟡 High: 0 issues
+        - 🔵 Medium: 0 issues
+        - ⚪ Low: 0 issues
+
+  - type: input
+    id: pr_link
+    attributes:
+      label: Pull Request
+      description: Link to the PR after creation
+      placeholder: "https://github.com/ZanettiLG/Audiobooker/pull/..."
+
+  - type: checkboxes
+    id: final_checklist
+    attributes:
+      label: Final Checklist
+      options:
+        - label: All tasks complete
+        - label: Tests passing (baseline preserved: 330 backend + 2 frontend)
+        - label: Lint: 0 warnings
+        - label: Typecheck: 0 errors
+        - label: Code review: 0 critical issues
+        - label: PR created and linked
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        ## 📊 Audit Summary
+        > **Research:** #[N] | **Planning:** #[N] | **Implementation:** this card
+        > **Dev review:** [ ] approved / [ ] rejected with notes
+        > **CI/CD:** [ ] green / [ ] red

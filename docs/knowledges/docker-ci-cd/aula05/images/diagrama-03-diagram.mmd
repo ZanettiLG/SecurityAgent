@@ -1,0 +1,5 @@
+flowchart LR
+    A[Estado Desejado: 3 réplicas] --> B[Observe: 2 réplicas rodando]
+    B --> C[Diff: falta 1 réplica]
+    C --> D[Act: criar nova réplica]
+    D --> B

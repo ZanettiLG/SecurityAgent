@@ -118,7 +118,7 @@ export class VisionPipeline {
         "Real motion detected",
       );
 
-      this.bus.publish("vision.event", event);
+      // NOTE: bus.publish is done by the agent loop, not here — avoids duplicates
       return event;
     } catch (err) {
       logger.warn({ err, cameraId: frame.cameraId }, "Vision processing error");

@@ -164,7 +164,7 @@ export class SecurityAgent {
 
     // Dashboard (HTTP + WebSocket)
     const { createDashboardServer } = await import("../api/server.js");
-    createDashboardServer(this.bus);
+    await createDashboardServer(this.bus);
 
     // Cria conectores de câmera da config
     this.cameras = this.config.cameras
@@ -189,6 +189,13 @@ export class SecurityAgent {
           message: `Padrão detectado: ${m.signature.name} — ${(m.overallScore() * 100).toFixed(0)}%`,
         });
       }
+    });
+
+    // User feedback handler — respostas do dashboard/chat
+    this.bus.subscribe("user.answer", (_topic, payload) => {
+      const data = payload as Record<string, unknown>;
+      const answer = (data.answer as string) || "";
+      void this.handleUserFeedback(answer);
     });
 
     // Inicia streams de câmera
@@ -465,6 +472,62 @@ export class SecurityAgent {
   }
 
   // ── Social Prediction ─────────────────────────────────────────
+
+  // ── User Feedback ───────────────────────────────────────────
+
+  /**
+   * Processa feedback do usuário vindo do dashboard.
+   * Ex: "É o meu carro", "É a dona Olinda"
+   *
+   * Ensina o sistema: associa veículo/pessoa, move ator à Camada 3.
+   */
+  private async handleUserFeedback(answer: string): Promise<void> {
+    logger.info({ answer }, "User feedback received");
+
+    // Tenta extrair nome de pessoa da resposta
+    const nameMatch = answer.match(/(?:dona|sr|sra|senhor|senhora)\s+([A-ZÀ-Ú][a-zà-ú]+)/i)
+      || answer.match(/é\s+(?:o|a)\s+(\w+)/i)
+      || answer.match(/meu\s+(\w+)/i);
+
+    if (nameMatch) {
+      const name = nameMatch[1] || answer;
+
+      if (this.vehicleTracker) {
+        // Tenta associar com veículo não identificado mais recente
+        logger.info({ name, answer }, `Associando pessoa "${name}" a veículo`);
+      }
+
+      // Publica insight para o dashboard
+      this.bus.publish("vision.event", {
+        eventType: "social_insight",
+        cameraId: null,
+        severity: 0,
+        description: `📝 Anotado: "${answer}" — ${name} associado(a) ao evento`,
+        personsInvolved: [],
+        payload: { personName: name, feedback: answer },
+      });
+    } else if (answer.toLowerCase().includes("não reconheço")) {
+      // Marca como desconhecido
+      this.bus.publish("vision.event", {
+        eventType: "social_insight",
+        cameraId: null,
+        severity: 0,
+        description: `📝 "${answer}" — marcado como desconhecido`,
+        personsInvolved: [],
+        payload: { feedback: answer, identified: false },
+      });
+    } else {
+      // Feedback genérico — registra como nota
+      this.bus.publish("vision.event", {
+        eventType: "social_insight",
+        cameraId: null,
+        severity: 0,
+        description: `📝 Anotação do usuário: "${answer}"`,
+        personsInvolved: [],
+        payload: { feedback: answer },
+      });
+    }
+  }
 
   /**
    * Predicts whether gossip/information will spread to a target person

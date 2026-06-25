@@ -1,0 +1,5 @@
+flowchart LR
+    D["Deployment<br/>réplicas: 3<br/>strategy: RollingUpdate"] --> RS["ReplicaSet<br/>controlador de réplicas"]
+    RS --> P1["Pod v2<br/>container: api-node:v2"]
+    RS --> P2["Pod v2<br/>container: api-node:v2"]
+    RS --> P3["Pod v2<br/>container: api-node:v2"]

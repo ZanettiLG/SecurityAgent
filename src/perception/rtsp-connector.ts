@@ -26,6 +26,7 @@ export class RtspConnector implements CameraConnector {
   readonly enabled: boolean;
   readonly username: string;
   readonly password: string;
+  readonly transport: string;
 
   private _connected = false;
   private process: ChildProcess | null = null;
@@ -40,6 +41,7 @@ export class RtspConnector implements CameraConnector {
     this.enabled = config.enabled;
     this.username = config.username ?? "";
     this.password = config.password ?? "";
+    this.transport = config.transport ?? "tcp";
 
     this.fps = (config as Record<string, unknown>).fps as number ?? 5;
     this.width = (config as Record<string, unknown>).width as number ?? 640;
@@ -72,14 +74,31 @@ export class RtspConnector implements CameraConnector {
 
     while (retries < this.maxRetries && this._connected) {
       try {
-        yield* this._streamInternal();
-        retries = 0;
+        let yielded = false;
+        for await (const frame of this._streamInternal()) {
+          yielded = true;
+          yield frame;
+          retries = 0; // Only reset on actual frame delivery
+        }
+        // Generator completed — ffmpeg likely crashed immediately
+        if (!yielded) {
+          retries++;
+          const backoff = Math.min(5000, 1000 * retries);
+          logger.warn({ retries, cameraId: this.cameraId, backoff }, "No frames received, backing off before reconnect");
+          this._stopProcess();
+          await sleep(backoff);
+        }
       } catch (err) {
         retries++;
-        logger.warn({ err, retries, cameraId: this.cameraId }, "RTSP stream error, reconnecting...");
+        const backoff = Math.min(30000, 2000 * retries);
+        logger.warn({ err, retries, cameraId: this.cameraId, backoff }, "RTSP stream error, reconnecting...");
         this._stopProcess();
-        await sleep(5000);
+        await sleep(backoff);
       }
+    }
+
+    if (retries >= this.maxRetries) {
+      logger.error({ cameraId: this.cameraId }, "Camera max retries exhausted — giving up");
     }
   }
 
@@ -117,9 +136,11 @@ export class RtspConnector implements CameraConnector {
   private _startFfmpeg(): ChildProcess {
     const authUrl = this._buildAuthenticatedUrl();
     // Escreve frames JPEG direto em arquivo (mais confiavel que MJPEG pipe no Windows)
+    // Usa .tmp para race-free: ffmpeg escreve no .tmp, renomeamos para .jpg atomicamente
     const framePath = `data/cam_${this.cameraId}.jpg`;
+    const tmpPath = `data/cam_${this.cameraId}.tmp.jpg`;
     const args = [
-      "-rtsp_transport", "tcp",
+      "-rtsp_transport", this.transport,
       "-y",                    // Overwrite without prompting
       "-timeout", "3000000",
       "-i", authUrl,
@@ -127,10 +148,10 @@ export class RtspConnector implements CameraConnector {
       "-r", String(this.fps),
       "-update", "1",
       "-q:v", "2",
-      framePath,
+      tmpPath,
     ];
 
-    logger.info({ cameraId: this.cameraId, framePath }, "Spawning ffmpeg (file mode)");
+    logger.info({ cameraId: this.cameraId, tmpPath, framePath }, "Spawning ffmpeg (file mode)");
 
     const proc = spawn("ffmpeg", args, {
       stdio: ["ignore", "pipe", "pipe"],
@@ -157,10 +178,11 @@ export class RtspConnector implements CameraConnector {
   // Remove old BOUNDARY/JPEG_SOI constants and use file polling instead
   private async *_streamInternal(): AsyncGenerator<CameraFrame> {
     const framePath = `data/cam_${this.cameraId}.jpg`;
+    const tmpPath = `data/cam_${this.cameraId}.tmp.jpg`;
     const proc = this._startFfmpeg();
     this.process = proc;
 
-    const { readFile, stat } = await import("node:fs/promises");
+    const { readFile, stat, rename } = await import("node:fs/promises");
     let lastSize = 0;
     let lastMtime = 0;
 
@@ -168,7 +190,7 @@ export class RtspConnector implements CameraConnector {
 
     while (this._connected && proc.exitCode === null) {
       try {
-        const s = await stat(framePath).catch(() => null);
+        const s = await stat(tmpPath).catch(() => null);
         if (!s || s.size < 500 || s.mtimeMs === lastMtime) {
           await sleep(1000 / this.fps);
           continue;
@@ -176,7 +198,10 @@ export class RtspConnector implements CameraConnector {
 
         lastSize = s.size;
         lastMtime = s.mtimeMs;
-        const data = await readFile(framePath);
+        const data = await readFile(tmpPath);
+
+        // Renomeia atomicamente para o path final — API sempre lê JPEG completo
+        await rename(tmpPath, framePath).catch(() => {});
 
         yield {
           cameraId: this.cameraId,

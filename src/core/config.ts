@@ -24,6 +24,7 @@ const CameraConfig = z.object({
   enabled: z.boolean().default(true),
   username: z.string().optional(),
   password: z.string().optional(),
+  transport: z.enum(["tcp", "udp"]).optional().default("tcp"),
   zones: z.array(z.object({
     name: z.string(),
     coords: z.array(z.number()),

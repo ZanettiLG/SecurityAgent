@@ -1,0 +1,7 @@
+flowchart TD
+    LB[Load Balancer Externo] --> N1[Nó 1: API réplica A]
+    LB --> N2[Nó 2: API réplica B]
+    LB --> N3[Nó 3: API réplica C]
+    N1 --> DB[(PostgreSQL no Nó 3)]
+    N2 --> DB
+    N3 --> DB

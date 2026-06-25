@@ -16,11 +16,12 @@ import { WebSocketServer, WebSocket } from "ws";
 import { logger } from "../core/logger.js";
 import type { EventBus } from "../core/bus.js";
 
-const PORT = 5174;
+let PORT = parseInt(process.env.DASHBOARD_PORT ?? "5174", 10);
 
-export function createDashboardServer(bus: EventBus) {
+export async function createDashboardServer(bus: EventBus) {
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
-    const url = new URL(req.url ?? "/", `http://localhost:${PORT}`);
+    const actualPort = PORT;
+    const url = new URL(req.url ?? "/", `http://localhost:${actualPort}`);
 
     // ── CORS ──
     res.setHeader("Access-Control-Allow-Origin", "*");
@@ -53,6 +54,28 @@ export function createDashboardServer(bus: EventBus) {
           res.writeHead(404, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ error: "No snapshot available" }));
         }
+      }
+
+      // ── Camera status ──
+      else if (url.pathname === "/api/cameras") {
+        // Check which camera snapshot files exist and are recent
+        const fs = await import("node:fs/promises");
+        const cameras = [
+          { id: "externa", name: "Intelbras iM7 — Externa" },
+          { id: "interna", name: "Yoosee — Interna" },
+        ];
+        const result = await Promise.all(cameras.map(async (cam) => {
+          const framePath = `data/cam_${cam.id}.jpg`;
+          try {
+            const stat = await fs.stat(framePath);
+            const age = Date.now() - stat.mtimeMs;
+            return { ...cam, online: age < 10000, lastFrame: stat.mtimeMs };
+          } catch {
+            return { ...cam, online: false, lastFrame: 0 };
+          }
+        }));
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(result));
       }
 
       // ── Recent events ──
@@ -108,10 +131,14 @@ export function createDashboardServer(bus: EventBus) {
     ws.on("message", (data: Buffer) => {
       try {
         const msg = JSON.parse(data.toString());
-        logger.debug({ msg }, "Dashboard message received");
-        // Forwarda respostas do chat para o EventBus
-        if (msg.type === "chat_response" && msg.questionId) {
-          bus.publish("user.answer", msg);
+        // Roteia resposta do chat para o EventBus → agent processa
+        if (msg.type === "chat_response") {
+          bus.publish("user.answer", {
+            messageId: msg.messageId,
+            answer: msg.answer,
+            timestamp: msg.timestamp,
+          });
+          logger.info({ answer: msg.answer }, "User reply received via dashboard");
         }
       } catch {
         // Ignora mensagens mal formatadas
@@ -124,9 +151,28 @@ export function createDashboardServer(bus: EventBus) {
     });
   });
 
-  server.listen(PORT, () => {
-    logger.info(`Dashboard server listening on http://localhost:${PORT}`);
+  // Tenta escutar na porta configurada, com fallback para portas seguintes
+  const MAX_RETRIES = 10;
+
+  await new Promise<void>((resolve, reject) => {
+    function tryListen(port: number) {
+      server.once("error", (err: NodeJS.ErrnoException) => {
+        if (err.code === "EADDRINUSE" && port < PORT + MAX_RETRIES) {
+          logger.warn(`Port ${port} is in use, trying ${port + 1}...`);
+          tryListen(port + 1);
+        } else {
+          reject(err);
+        }
+      });
+
+      server.listen(port, () => {
+        PORT = port; // atualiza porta para o handler HTTP usar o valor correto
+        logger.info(`Dashboard server listening on http://localhost:${port}`);
+        resolve();
+      });
+    }
+
+    tryListen(PORT);
   });
 
-  return server;
-}
+  return { server, port: PORT };

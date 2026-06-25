@@ -1,0 +1,18 @@
+flowchart TB
+    subgraph CP["Control Plane (Cérebro)"]
+        API["API Server<br/>porta de entrada única"]
+        ST[("State Store<br/>banco consistente")]
+        SCH["Scheduler<br/>decide onde rodar"]
+        CTM["Controller Manager<br/>executa os loops"]
+    end
+    subgraph DP["Data Plane (Músculo)"]
+        W1["Nó Worker 1<br/>Agent + Runtime + Proxy"]
+        W2["Nó Worker 2<br/>Agent + Runtime + Proxy"]
+        WN["Nó Worker N<br/>Agent + Runtime + Proxy"]
+    end
+    API --> W1
+    API --> W2
+    API --> WN
+    SCH --> W1
+    SCH --> W2
+    SCH --> WN

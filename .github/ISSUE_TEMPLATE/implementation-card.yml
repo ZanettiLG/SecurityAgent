@@ -1,0 +1,69 @@
+name: ⚙️ Implementation Card
+description: Agent handoff card — code changes and review summary (filled by coder + code-reviewer)
+title: "impl: "
+labels: ["agent:implementation", "status:in-progress"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        > 📋 **Phase 3/3 — Implementation**. Filled by the `coder` and `code-reviewer` agents.
+        > This card is the audit trail of what was built.
+
+  - type: input
+    id: planning_ref
+    attributes:
+      label: Planning Card Reference
+      placeholder: "#123"
+
+  - type: textarea
+    id: tasks_status
+    attributes:
+      label: Task Status
+      value: |
+        - [ ] Task 1: [Name] — pending
+        - [ ] Task 2: [Name] — pending
+
+  - type: textarea
+    id: files_changed
+    attributes:
+      label: Files Changed
+      value: |
+        | File | Action | Notes |
+        |---|---|---|
+        | `path/to/file.ts` | created | [description] |
+
+  - type: textarea
+    id: tests
+    attributes:
+      label: Tests Added
+      value: |
+        | Test file | Tests | Coverage |
+        |---|---|---|
+        | `__tests__/feature.test.ts` | N | [scenarios] |
+
+  - type: textarea
+    id: review
+    attributes:
+      label: Code Review
+      value: |
+        - 🔴 Critical: 0
+        - 🟡 High: 0
+        - 🔵 Medium: 0
+        - ⚪ Low: 0
+
+  - type: input
+    id: pr
+    attributes:
+      label: Pull Request
+      placeholder: "https://github.com/ZanettiLG/Audiobooker/pull/..."
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Final Checklist
+      options:
+        - label: All tasks complete
+        - label: Tests passing (baseline preserved)
+        - label: Lint 0 + typecheck 0
+        - label: Code review: 0 critical
+        - label: PR linked
