@@ -352,7 +352,7 @@ function exibirComentario(comentario) {
 
 ```python
 # VULNERÁVEL: chave de API hardcoded
-API_KEY = "sk_live_REPLACED"
+API_KEY = "sk_live_substitua_pela_sua_chave"
 ```
 
 **DEPOIS (corrigido):**
@@ -502,7 +502,7 @@ Mantenha um arquivo `.env.example` no repositório que documenta todas as variá
 ```bash
 # .env.example
 DATABASE_URL=postgres://usuario:senha@localhost:5432/ecommerce
-STRIPE_API_KEY=sk_test_REPLACED
+STRIPE_API_KEY=sk_test_xxxxxxxxxxxx
 SECRET_KEY=chave-aleatoria-para-django
 SENDGRID_API_KEY=SG.xxxxxxxxxxxx
 ```
@@ -535,7 +535,7 @@ repos:
 INFO Gitleaks v8.18.0
 INFO scan completed in 2.3s
 
-Finding:   server/config.py:15:API_KEY = "sk_live_REPLACED"
+Finding:   server/config.py:15:API_KEY = "sk_live_substitua_pela_sua_chave"
 Rule:      Stripe API Key
 Severity:  HIGH
 Commit:    a1b2c3d4e5f6...
