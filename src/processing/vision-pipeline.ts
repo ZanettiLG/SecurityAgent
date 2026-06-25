@@ -20,11 +20,10 @@ export class VisionPipeline {
   private frameCounts = new Map<string, number>();
   private readonly frameSkip = 3;
 
-<<<<<<< HEAD
   /** Stores the previous frame's raw pixel buffer per camera for diffing */
   private previousFrames = new Map<string, Buffer>();
 
-/** Minimum percentage of changed pixels to trigger motion (default 1%) */
+  /** Minimum percentage of changed pixels to trigger motion (default 1%) */
   private readonly motionThreshold = 0.01;
 
   /** Downsample frames to this width for faster processing */
@@ -34,8 +33,6 @@ export class VisionPipeline {
   private diagCount = 0;
   private diagLastLog = 0;
 
-=======
->>>>>>> f19a48228ddaed8b851fae4e1d326d87e14b9982
   constructor(
     private bus: EventBus,
     private memory?: MemorySystem,
@@ -50,31 +47,40 @@ export class VisionPipeline {
     const count = (this.frameCounts.get(frame.cameraId) ?? 0) + 1;
     this.frameCounts.set(frame.cameraId, count);
 
-<<<<<<< HEAD
     if (count === 1 || count % 60 === 0) {
-      logger.info({ cameraId: frame.cameraId, count, size: frame.data.length }, "Frame received");
+      logger.info(
+        { cameraId: frame.cameraId, count, size: frame.data.length },
+        "Frame received",
+      );
     }
 
-=======
->>>>>>> f19a48228ddaed8b851fae4e1d326d87e14b9982
     if (count % this.frameSkip !== 0) {
       return null;
     }
 
-<<<<<<< HEAD
     try {
       // Decode JPEG with retry — ffmpeg may be mid-write
-      let raw: { data: Buffer; info: { width: number; height: number; channels: number } };
+      let raw: {
+        data: Buffer;
+        info: { width: number; height: number; channels: number };
+      };
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
           raw = await sharp(frame.data)
-            .resize(this.compareWidth, Math.round(this.compareWidth * (frame.height / frame.width)))
+            .resize(
+              this.compareWidth,
+              Math.round(this.compareWidth * (frame.height / frame.width)),
+            )
             .raw()
             .toBuffer({ resolveWithObject: true });
           break;
         } catch (e: any) {
-          if (attempt === 2 || (!e.message?.includes("empty") && !e.message?.includes("premature"))) throw e;
-          await new Promise(r => setTimeout(r, 50)); // Espera ffmpeg terminar de escrever
+          if (
+            attempt === 2 ||
+            (!e.message?.includes("empty") && !e.message?.includes("premature"))
+          )
+            throw e;
+          await new Promise((r) => setTimeout(r, 50)); // Espera ffmpeg terminar de escrever
         }
       }
       raw = raw!;
@@ -98,7 +104,14 @@ export class VisionPipeline {
       this.diagCount++;
       if (this.diagCount - this.diagLastLog >= 30) {
         this.diagLastLog = this.diagCount;
-        logger.info({ cameraId: frame.cameraId, changeRatio: (changeRatio * 100).toFixed(2) + "%", changedPixels }, "Vision diag");
+        logger.info(
+          {
+            cameraId: frame.cameraId,
+            changeRatio: (changeRatio * 100).toFixed(2) + "%",
+            changedPixels,
+          },
+          "Vision diag",
+        );
       }
 
       if (changeRatio < this.motionThreshold) {
@@ -154,36 +167,3 @@ export class VisionPipeline {
     return changed;
   }
 }
-
-=======
-    // ── Simulated motion detection: 30% chance ────────────────
-    const motionDetected = Math.random() < 0.3;
-
-    if (!motionDetected) {
-      return null;
-    }
-
-    // ── Create motion event ───────────────────────────────────
-    const event = createEvent({
-      eventType: EventType.MOTION_DETECTED,
-      cameraId: frame.cameraId,
-      severity: Severity.INFO,
-      description: `Movimento detectado na câmera ${frame.cameraId}`,
-      payload: {
-        frameTimestamp: frame.timestamp.toISOString(),
-        confidence: 0.8,
-      },
-    });
-
-    logger.debug(
-      { eventId: event.eventId, cameraId: frame.cameraId },
-      "Motion detected event created",
-    );
-
-    // ── Publish to event bus ──────────────────────────────────
-    this.bus.publish("vision.event", event);
-
-    return event;
-  }
-}
->>>>>>> f19a48228ddaed8b851fae4e1d326d87e14b9982
