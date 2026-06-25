@@ -165,7 +165,6 @@ export class SecurityAgent {
     // Dashboard (HTTP + WebSocket)
     const { createDashboardServer } = await import("../api/server.js");
     await createDashboardServer(this.bus);
-
     // Cria conectores de câmera da config
     this.cameras = this.config.cameras
       .filter((c) => c.enabled)
