@@ -3,7 +3,7 @@
     "SessionStart": [
       {
         "type": "command",
-        "command": "node scripts/harness-state.js",
+        "command": "node .github/scripts/harness-state.js",
         "timeout": 10
       }
     ]
