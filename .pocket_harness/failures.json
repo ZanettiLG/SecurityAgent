@@ -1,14 +1,14 @@
 {
-  "timestamp": "2026-06-28T06:20:22.738Z",
+  "timestamp": "2026-06-28T06:50:24.474Z",
   "trajectorySize": 50,
   "failures": [
     {
       "type": "stalled_objective",
       "severity": "medium",
-      "editRatio": "0.12",
-      "totalReads": 34,
-      "totalEdits": 4,
-      "description": "Stalled: 34 reads vs only 4 edits over 50 calls (ratio: 0.12)."
+      "editRatio": "0.00",
+      "totalReads": 46,
+      "totalEdits": 0,
+      "description": "Stalled: 46 reads vs only 0 edits over 50 calls (ratio: 0.00)."
     }
   ],
   "summary": "Detected 1 failure signature(s): stalled_objective.",

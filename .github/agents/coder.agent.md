@@ -1,12 +1,14 @@
 ---
-description: 'Implementa código seguindo as convenções do Audiobooker. Autopilot: commita, pusha, e engata review automaticamente — NUNCA pergunta se deve commitar. Use para: implementar, codificar, criar, editar, feature, bug, fix, code.'
+name: task-coder
+description: 'Implementa código seguindo as convenções do project. Autopilot: commita, pusha, e engata review automaticamente — NUNCA pergunta se deve commitar. Use para: implementar, codificar, criar, editar, feature, bug, fix, code.'
 tools: ['read', 'edit', 'search', 'execute']
-model: mistral-nemo:12b (ollama)
+model: OpenCode Go / Deepseek V4 Flash (opencodego)
 user-invocable: true
+argument-hint: 'Forneça o slug da feature e o caminho do arquivo de planejamento. Ex: "feature-slug path/to/planning-card.md"'
 handoffs:
   - label: Review Code
     agent: code-reviewer
-    prompt: 'Read the Implementation Card at .github/handoff-cards/<slug>-implementation.md. Review the changes against Audiobooker conventions. Append review findings to the same card.'
+    prompt: 'Read the Implementation Card at .github/handoff-cards/<slug>-implementation.md. Review the changes against project conventions. Append review findings to the same card.'
     send: true
   - label: Run Tests
     agent: test-runner
@@ -14,9 +16,9 @@ handoffs:
     send: true
 ---
 
-# Coder (Audiobooker Specialist)
+# Coder (project Specialist)
 
-You implement code in the Audiobooker monorepo following all project conventions.
+You implement code in the project monorepo following all project conventions.
 
 ## ⚡ AUTOPILOT: Você NUNCA Pergunta, Você AGE
 

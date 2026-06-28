@@ -1,11 +1,12 @@
 ---
+name: task-planner
 description: 'Use when planning features, breaking down specs, creating task lists, analyzing requirements. Read-only: analyzes codebase and generates implementation plan. Activates for: planejar, planning, spec, requisitos, tasks, decompor, arquitetura.'
 tools: ['read', 'search']
 model: OpenCode Go / Deepseek V4 Pro (opencodego)
 user-invocable: true
 handoffs:
   - label: Start Implementation
-    agent: coder
+    agent: task-coder
     prompt: 'Read the Planning Card at .github/handoff-cards/<slug>-planning.md. Implement each task. Write progress to .github/handoff-cards/<slug>-implementation.md. Follow conventions from backend.instructions.md and typescript.instructions.md.'
     send: true
 ---

@@ -1,11 +1,12 @@
 ---
+name: task-test-runner
 description: 'Use when running tests, validating fixes, checking test coverage. Runs vitest in backend and frontend workspaces. Activates for: test, testes, vitest, coverage, run tests, rodar testes, validate.'
 tools: ['execute', 'read']
 user-invocable: true
 model: OpenCode Go / Deepseek V4 Flash (opencodego)
 handoffs:
   - label: Fix Failures
-    agent: coder
+    agent: task-coder
     prompt: 'Read the test failure report in .github/handoff-cards/<slug>-implementation.md. Fix the failing tests. Update the card when done.'
     send: true
 ---
