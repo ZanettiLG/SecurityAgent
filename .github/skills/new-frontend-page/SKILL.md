@@ -1,4 +1,5 @@
 ---
+context: fork
 name: new-frontend-page
 description: >
   Scaffolds a Next.js 14 App Router page in the Audiobooker frontend with the

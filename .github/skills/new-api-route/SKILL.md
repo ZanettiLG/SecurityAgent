@@ -1,4 +1,5 @@
 ---
+context: fork
 name: new-api-route
 description: Scaffolds a new Express API route in the Audiobooker backend — Zod validation, { ok, data } envelope, SSE streaming boilerplate, and server.ts registration. Use when the user asks to create a new endpoint, add an API route, or scaffold a backend handler.
 applyTo: "backend/src/api/**"

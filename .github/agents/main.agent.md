@@ -2,7 +2,7 @@
 description: 'Delegador puro — NUNCA faz trabalho, apenas decompõe e delega para subagentes especializados. Ative para: tarefas complexas, multi-step, features completas, qualquer coisa que exija +1 domínio.'
 tools: ['read', 'search']
 user-invocable: true
-model: 'DeepSeek V4 Pro (OpenCode Go)'
+model: OpenCode Go / Deepseek V4 Pro (opencodego)
 handoffs:
   - label: Explorar Codebase
     agent: researcher

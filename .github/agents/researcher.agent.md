@@ -2,7 +2,7 @@
 description: 'Read-only agent for exploring the Audiobooker codebase before implementation. Maps relevant files, discovers constraints and patterns, and produces a structured Research Card for handoff to planning. Activates for: research, pesquisar, explorar, codebase exploration, mapear código, levantar requisitos.'
 tools: ['read', 'search']
 user-invocable: true
-model: 'DeepSeek V4 Flash (OpenCode Go)'
+model: OpenCode Go / Deepseek V4 Flash (opencodego)
 handoffs:
   - label: Plan Feature
     agent: planner

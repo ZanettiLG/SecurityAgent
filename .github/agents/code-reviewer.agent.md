@@ -2,7 +2,7 @@
 description: 'Use when reviewing code changes, PR review, checking conventions, validating patterns, security audit. Read-only agent. Activates for: review, revisão, code review, audit, check conventions.'
 tools: ['read', 'search']
 user-invocable: true
-model: 'DeepSeek V4 Flash (OpenCode Go)'
+model: OpenCode Go / Deepseek V4 Flash (opencodego)
 handoffs:
   - label: Fix Issues
     agent: coder

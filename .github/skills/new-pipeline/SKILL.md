@@ -1,4 +1,5 @@
 ---
+context: fork
 name: new-pipeline
 description: >-
   Scaffolds a new pipeline in the Audiobooker project following the established pattern

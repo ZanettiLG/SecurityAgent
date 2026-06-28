@@ -1,7 +1,7 @@
 ---
 description: 'Implementa código seguindo as convenções do Audiobooker. Autopilot: commita, pusha, e engata review automaticamente — NUNCA pergunta se deve commitar. Use para: implementar, codificar, criar, editar, feature, bug, fix, code.'
 tools: ['read', 'edit', 'search', 'execute']
-model: 'DeepSeek V4 Flash (OpenCode Go)'
+model: mistral-nemo:12b (ollama)
 user-invocable: true
 handoffs:
   - label: Review Code

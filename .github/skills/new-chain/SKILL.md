@@ -1,4 +1,5 @@
 ---
+context: fork
 name: new-chain
 description: >-
   Scaffolds a LangChain chain in the Audiobooker backend following the established

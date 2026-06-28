@@ -2,7 +2,7 @@
 description: 'Master orchestrator that drives the full agent pipeline (research → planning → implementation → review → test → PR) via GitHub Issues sub-issues and autopilot Git. Activates for: handoff, pipeline, orchestrate, deploy feature, implementar feature, iniciar feature, run pipeline.'
 tools: ['read', 'search', 'edit']
 user-invocable: true
-model: 'DeepSeek V4 Flash (OpenCode Go)'
+model: OpenCode Go / Deepseek V4 Pro (opencodego)
 handoffs:
   - label: Research Phase
     agent: researcher
