@@ -3,7 +3,7 @@
     "Stop": [
       {
         "type": "command",
-        "command": "node .github/scripts/failure-detector.js && node .github/scripts/prompt-refiner.js && node .github/scripts/subagent-refiner.js && node .github/scripts/skill-refiner.js && node .github/scripts/memory-refiner.js && node .github/scripts/check-quality-gates.js",
+        "command": "node .github/scripts/failure-detector.js; node .github/scripts/prompt-refiner.js; node .github/scripts/subagent-refiner.js; node .github/scripts/skill-refiner.js; node .github/scripts/memory-refiner.js; node .github/scripts/check-quality-gates.js",
         "timeout": 60
       }
     ]
