@@ -62,6 +62,7 @@ flowchart TD
 ## Convenções para Todos os Arquivos
 
 ### Estilo de código
+
 - TypeScript strict mode
 - ESM (`import`/`export`, `"type": "module"` no package.json)
 - Zod para validação de entrada
@@ -70,12 +71,14 @@ flowchart TD
 - Eventos publicados via `EventBus` (`src/core/bus.ts`)
 
 ### Padrão de arquivo
+
 - Um arquivo `.ts` por módulo
 - Interfaces exportadas, implementações default export ou named export
 - Testes manuais com `logger.info()` em pontos-chave
 - TODO markers para integrações externas (APIs de hardware, serviços cloud)
 
 ### Nomenclatura
+
 - `camelCase` para variáveis e métodos
 - `PascalCase` para classes, interfaces, tipos
 - `UPPER_SNAKE` para constantes e enums `as const`
@@ -85,23 +88,24 @@ flowchart TD
 
 ## Checklist de Handoff
 
-| # | Tarefa | Dependências | Complexidade | Status |
-|---|--------|-------------|-------------|--------|
-| 01 | Perception + Vision Pipeline | Nenhuma | Alta | ⬜ |
-| 02 | VehicleTracker (port) | 01, 08 | Média | ⬜ |
-| 03 | Agent Wire-up | 01, 02, 04, 07, 08 | Alta | ⬜ |
-| 04 | LLM Client | Nenhuma | Média | ⬜ |
-| 05 | Retrospective Analyzer | 04, 07 | Média | ⬜ |
-| 06 | Social Prediction (port) | Nenhuma | Baixa | ⬜ |
-| 07 | Persistence Layer | Nenhuma | Alta | ⬜ |
-| 08 | Behavioral Fixes | Nenhuma | Baixa | ⬜ |
-| 09 | Knowledge + Social | 07 | Média | ⬜ |
+| #   | Tarefa                       | Dependências       | Complexidade | Status | Observação                                                                                                                                                 |
+| --- | ---------------------------- | ------------------ | ------------ | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 01  | Perception + Vision Pipeline | Nenhuma            | Alta         | ✅     | `camera-connector.ts`, `vision-pipeline.ts`, `rtsp-connector.ts`, `mock-connector.ts` implementados                                                        |
+| 02  | VehicleTracker (port)        | 01, 08             | Média        | ✅     | Portado para `src/processing/vehicle-tracker.ts`                                                                                                           |
+| 03  | Agent Wire-up                | 01, 02, 04, 07, 08 | Alta         | 🔄     | `agent.ts` existe, integrações com subsistemas presentes, pode precisar de refinamento                                                                     |
+| 04  | LLM Client                   | Nenhuma            | Média        | ✅     | OpenAI e Ollama integrados via `config.ts` + `agent.ts`                                                                                                    |
+| 05  | Retrospective Analyzer       | 04, 07             | Média        | ✅     | `src/reasoning/retrospective.ts` implementado                                                                                                              |
+| 06  | Social Prediction (port)     | Nenhuma            | Baixa        | ✅     | `src/reasoning/social-prediction.ts` portado                                                                                                               |
+| 07  | Persistence Layer            | Nenhuma            | Alta         | 🔄     | `sqlite-event-store.ts`, `chroma-vector-store.ts`, `knowledge-graph.ts` implementados; `person-store.ts`, `routine_learner.ts`, `pattern_miner.ts` existem |
+| 08  | Behavioral Fixes             | Nenhuma            | Baixa        | ✅     | `src/reasoning/behavioral_pattern.ts` + `hypothesis.ts` implementados                                                                                      |
+| 09  | Knowledge + Social           | 07                 | Média        | ✅     | `knowledge-graph.ts` + `social-investigator.ts` implementados                                                                                              |
 
 ---
 
 ## Verificação de Integração
 
 Após todas as tarefas, o sistema deve:
+
 1. `npm run typecheck` passar sem erros
 2. `npm run dev` iniciar sem crashes
 3. O agente publicar eventos de câmera mock no EventBus
