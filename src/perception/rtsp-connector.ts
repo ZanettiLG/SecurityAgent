@@ -30,7 +30,7 @@ export class RtspConnector implements CameraConnector {
 
   private _connected = false;
   private process: ChildProcess | null = null;
-  private readonly maxRetries = 30;  // Aguentar horas de monitoramento
+  private readonly maxRetries = 30; // Aguentar horas de monitoramento
   private fps: number;
   private width: number;
   private height: number;
@@ -43,9 +43,9 @@ export class RtspConnector implements CameraConnector {
     this.password = config.password ?? "";
     this.transport = config.transport ?? "tcp";
 
-    this.fps = (config as Record<string, unknown>).fps as number ?? 5;
-    this.width = (config as Record<string, unknown>).width as number ?? 640;
-    this.height = (config as Record<string, unknown>).height as number ?? 480;
+    this.fps = ((config as Record<string, unknown>).fps as number) ?? 5;
+    this.width = ((config as Record<string, unknown>).width as number) ?? 640;
+    this.height = ((config as Record<string, unknown>).height as number) ?? 480;
   }
 
   get isConnected(): boolean {
@@ -53,7 +53,10 @@ export class RtspConnector implements CameraConnector {
   }
 
   async connect(): Promise<void> {
-    logger.info({ cameraId: this.cameraId, source: this.source }, "RTSP camera connecting");
+    logger.info(
+      { cameraId: this.cameraId, source: this.source },
+      "RTSP camera connecting",
+    );
     this._connected = true;
   }
 
@@ -84,21 +87,30 @@ export class RtspConnector implements CameraConnector {
         if (!yielded) {
           retries++;
           const backoff = Math.min(5000, 1000 * retries);
-          logger.warn({ retries, cameraId: this.cameraId, backoff }, "No frames received, backing off before reconnect");
+          logger.warn(
+            { retries, cameraId: this.cameraId, backoff },
+            "No frames received, backing off before reconnect",
+          );
           this._stopProcess();
           await sleep(backoff);
         }
       } catch (err) {
         retries++;
         const backoff = Math.min(30000, 2000 * retries);
-        logger.warn({ err, retries, cameraId: this.cameraId, backoff }, "RTSP stream error, reconnecting...");
+        logger.warn(
+          { err, retries, cameraId: this.cameraId, backoff },
+          "RTSP stream error, reconnecting...",
+        );
         this._stopProcess();
         await sleep(backoff);
       }
     }
 
     if (retries >= this.maxRetries) {
-      logger.error({ cameraId: this.cameraId }, "Camera max retries exhausted — giving up");
+      logger.error(
+        { cameraId: this.cameraId },
+        "Camera max retries exhausted — giving up",
+      );
     }
   }
 
@@ -127,7 +139,10 @@ export class RtspConnector implements CameraConnector {
         return url.toString();
       } catch {
         // Se a URL for inválida, tenta montar manualmente
-        return this.source.replace("rtsp://", `rtsp://${this.username}:${this.password}@`);
+        return this.source.replace(
+          "rtsp://",
+          `rtsp://${this.username}:${this.password}@`,
+        );
       }
     }
     return this.source;
@@ -140,18 +155,28 @@ export class RtspConnector implements CameraConnector {
     const framePath = `data/cam_${this.cameraId}.jpg`;
     const tmpPath = `data/cam_${this.cameraId}.tmp.jpg`;
     const args = [
-      "-rtsp_transport", this.transport,
-      "-y",                    // Overwrite without prompting
-      "-timeout", "3000000",
-      "-i", authUrl,
-      "-f", "image2",
-      "-r", String(this.fps),
-      "-update", "1",
-      "-q:v", "2",
+      "-rtsp_transport",
+      this.transport,
+      "-y", // Overwrite without prompting
+      "-timeout",
+      "3000000",
+      "-i",
+      authUrl,
+      "-f",
+      "image2",
+      "-r",
+      String(this.fps),
+      "-update",
+      "1",
+      "-q:v",
+      "2",
       tmpPath,
     ];
 
-    logger.info({ cameraId: this.cameraId, tmpPath, framePath }, "Spawning ffmpeg (file mode)");
+    logger.info(
+      { cameraId: this.cameraId, tmpPath, framePath },
+      "Spawning ffmpeg (file mode)",
+    );
 
     const proc = spawn("ffmpeg", args, {
       stdio: ["ignore", "pipe", "pipe"],
@@ -160,12 +185,18 @@ export class RtspConnector implements CameraConnector {
     proc.stderr?.on("data", (data: Buffer) => {
       const msg = data.toString().trim();
       if (msg.includes("Error") || msg.includes("Stream #0")) {
-        logger.info({ cameraId: this.cameraId, ffmpeg: msg.split("\n")[0] }, "ffmpeg");
+        logger.info(
+          { cameraId: this.cameraId, ffmpeg: msg.split("\n")[0] },
+          "ffmpeg",
+        );
       }
     });
 
     proc.on("exit", (code) => {
-      logger.warn({ cameraId: this.cameraId, exitCode: code }, "ffmpeg process exited");
+      logger.warn(
+        { cameraId: this.cameraId, exitCode: code },
+        "ffmpeg process exited",
+      );
     });
 
     proc.on("error", (err) => {
@@ -186,7 +217,7 @@ export class RtspConnector implements CameraConnector {
     let lastSize = 0;
     let lastMtime = 0;
 
-    const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
     while (this._connected && proc.exitCode === null) {
       try {
@@ -199,6 +230,22 @@ export class RtspConnector implements CameraConnector {
         lastSize = s.size;
         lastMtime = s.mtimeMs;
         const data = await readFile(tmpPath);
+
+        // Validate JPEG magic bytes (FF D8) — skip corrupt/empty frames
+        if (data.length < 2 || data[0] !== 0xff || data[1] !== 0xd8) {
+          logger.warn(
+            {
+              cameraId: this.cameraId,
+              size: data.length,
+              magic: data.slice(0, 4).toString("hex"),
+            },
+            "Skipping non-JPEG frame (missing SOI marker)",
+          );
+          // Still rename to avoid re-reading the same bad file
+          await rename(tmpPath, framePath).catch(() => {});
+          await sleep(1000 / this.fps);
+          continue;
+        }
 
         // Renomeia atomicamente para o path final — API sempre lê JPEG completo
         await rename(tmpPath, framePath).catch(() => {});

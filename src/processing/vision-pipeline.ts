@@ -58,12 +58,21 @@ export class VisionPipeline {
       return null;
     }
 
+    // Guard: skip frames with empty or trivially small data
+    if (!frame.data || frame.data.length < 100) {
+      logger.warn(
+        { cameraId: frame.cameraId, size: frame.data?.length ?? 0 },
+        "Skipping empty/undersized frame",
+      );
+      return null;
+    }
+
     try {
       // Decode JPEG with retry — ffmpeg may be mid-write
       let raw: {
         data: Buffer;
         info: { width: number; height: number; channels: number };
-      };
+      } | null = null;
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
           raw = await sharp(frame.data)
@@ -76,14 +85,27 @@ export class VisionPipeline {
           break;
         } catch (e: any) {
           if (
-            attempt === 2 ||
-            (!e.message?.includes("empty") && !e.message?.includes("premature"))
-          )
-            throw e;
-          await new Promise((r) => setTimeout(r, 50)); // Espera ffmpeg terminar de escrever
+            !e.message?.includes("empty") &&
+            !e.message?.includes("premature") &&
+            !e.message?.includes("corrupt")
+          ) {
+            throw e; // Unknown error — let it bubble up
+          }
+          if (attempt === 2) {
+            logger.warn(
+              {
+                cameraId: frame.cameraId,
+                err: e.message,
+                attempts: attempt + 1,
+              },
+              "Frame decode failed after retries, skipping",
+            );
+            return null; // Graceful skip instead of crashing the camera loop
+          }
+          await new Promise((r) => setTimeout(r, 100)); // Espera ffmpeg terminar de escrever
         }
       }
-      raw = raw!;
+      if (!raw) return null;
 
       const currentPixels = raw.data;
       const prevPixels = this.previousFrames.get(frame.cameraId);
