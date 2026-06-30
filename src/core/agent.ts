@@ -280,6 +280,9 @@ export class SecurityAgent {
     // 1. Armazenar na memória
     await this.storeInMemory(event);
 
+    // 1b. Enriquecer evento com contexto do Knowledge Graph
+    await this.enrichEventWithContext(event);
+
     // 2. Aprender rotina (Vigia — 3 camadas)
     await this.learnRoutine(event);
 
@@ -334,6 +337,77 @@ export class SecurityAgent {
 
   private async storeInMemory(event: SecurityEvent): Promise<void> {
     await this.memory?.store(event);
+  }
+
+  private async enrichEventWithContext(event: SecurityEvent): Promise<void> {
+    if (!this.memory) return;
+
+    // Enrich with KG context for persons involved
+    for (const pid of event.personsInvolved) {
+      const ctx = this.memory.knowledgeGraph.getFullContext(pid);
+      if (ctx.entity) {
+        if (!event.payload.kgContext) {
+          event.payload.kgContext = {};
+        }
+        const kgCtx = event.payload.kgContext as Record<string, unknown>;
+        kgCtx[pid] = ctx;
+      }
+    }
+
+    // Enrich with KG context for vehicles
+    const vehicleId = event.payload.vehicleId as string | undefined;
+    if (vehicleId) {
+      const ctx = this.memory.knowledgeGraph.getFullContext(vehicleId);
+      if (ctx.entity) {
+        if (!event.payload.kgContext) {
+          event.payload.kgContext = {};
+        }
+        const kgCtx = event.payload.kgContext as Record<string, unknown>;
+        kgCtx[vehicleId] = ctx;
+      }
+    }
+
+    // Create KG edges: persons involved → SEEN_AT → camera
+    if (event.cameraId) {
+      for (const pid of event.personsInvolved) {
+        // Only link if not already linked
+        const existing = this.memory.knowledgeGraph.getEdges(pid);
+        const hasEdge = existing.some(
+          (e) =>
+            e.to === `camera:${event.cameraId}` ||
+            e.from === `camera:${event.cameraId}`,
+        );
+        if (!hasEdge) {
+          this.memory.knowledgeGraph.addEdge(
+            pid,
+            `camera:${event.cameraId}`,
+            "SEEN_AT",
+            {
+              timestamp: event.timestamp.toISOString(),
+              cameraId: event.cameraId,
+            },
+          );
+        }
+      }
+    }
+
+    // Associate persons with vehicles if both present
+    if (vehicleId) {
+      for (const pid of event.personsInvolved) {
+        const vehicles = this.memory.knowledgeGraph.getVehiclesForPerson(pid);
+        if (!vehicles.includes(vehicleId)) {
+          this.memory.knowledgeGraph.addEdge(
+            pid,
+            vehicleId,
+            "ASSOCIATED_WITH",
+            {
+              confidence: 0.5,
+              firstSeen: event.timestamp.toISOString(),
+            },
+          );
+        }
+      }
+    }
   }
 
   private async learnRoutine(event: SecurityEvent): Promise<void> {

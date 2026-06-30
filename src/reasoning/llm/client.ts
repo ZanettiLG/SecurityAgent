@@ -85,11 +85,56 @@ export class LlmClient {
 
   /**
    * Avalia um evento de segurança e retorna uma avaliação estruturada.
+   * O contexto pode incluir `kgContext` (Knowledge Graph enrichment)
+   * e `sceneContext` (SceneContext do agente) para análise enriquecida.
    */
   async evaluate(
     event: SecurityEvent,
     context: Record<string, unknown>,
   ): Promise<LlmAssessment> {
+    const enrichedLines: string[] = [];
+
+    // Add SceneContext if present
+    const sceneCtx = context.sceneContext as
+      Record<string, unknown> | undefined;
+    if (sceneCtx) {
+      enrichedLines.push("## Contexto de Cena");
+      enrichedLines.push(`Local: ${sceneCtx.label ?? "N/A"}`);
+      enrichedLines.push(`Descrição: ${sceneCtx.description ?? ""}`);
+      const residents = sceneCtx.knownResidents as
+        Array<{ name: string; relationship: string }> | undefined;
+      if (residents?.length) {
+        enrichedLines.push(
+          `Residentes: ${residents.map((r) => `${r.name} (${r.relationship})`).join(", ")}`,
+        );
+      }
+      enrichedLines.push("");
+    }
+
+    // Add KG enrichment if present
+    const kgCtx = event.payload.kgContext as
+      Record<string, unknown> | undefined;
+    if (kgCtx) {
+      enrichedLines.push("## Knowledge Graph Context");
+      for (const [entityId, entityCtx] of Object.entries(kgCtx)) {
+        const ctx = entityCtx as Record<string, unknown>;
+        const entity = ctx.entity as Record<string, unknown> | undefined;
+        if (entity) {
+          enrichedLines.push(
+            `Entidade: ${entity.label as string} (${entity.type as string})`,
+          );
+          const neighbors = ctx.neighbors as
+            Array<Record<string, unknown>> | undefined;
+          if (neighbors?.length) {
+            enrichedLines.push(
+              `  Relacionamentos: ${neighbors.map((n) => `${n.label as string} (${n.type as string})`).join(", ")}`,
+            );
+          }
+        }
+      }
+      enrichedLines.push("");
+    }
+
     const userPrompt = [
       "Analise o seguinte evento de segurança:",
       "",
@@ -101,6 +146,7 @@ export class LlmClient {
       `Pessoas envolvidas: ${event.personsInvolved.join(", ") || "nenhuma"}`,
       `Payload: ${JSON.stringify(event.payload)}`,
       "",
+      ...enrichedLines,
       "Contexto adicional:",
       JSON.stringify(context, null, 2),
       "",
