@@ -41,6 +41,10 @@ const CameraConfig = z.object({
       frameSkip: z.number().default(3),
     })
     .default({}),
+  /** ONVIF HTTP port (defaults to 80, or inferred from source URL if http/https) */
+  onvifPort: z.number().int().min(1).max(65535).optional(),
+  /** Disable WS-Security for cameras that only support Digest auth */
+  onvifUseWSSecurity: z.boolean().default(false).optional(),
 });
 
 const VigiaConfig = z.object({
@@ -82,11 +86,10 @@ const VigiaConfig = z.object({
 });
 
 const LlmConfig = z.object({
-  provider: z.enum(["openai", "anthropic", "ollama"]).default("openai"),
-  model: z.string().default("gpt-4o-mini"),
+  baseUrl: z.string().default("http://localhost:11434/v1"),
   apiKey: z.string().optional(),
-  baseUrl: z.string().nullable().default(null),
-  maxTokens: z.number().default(1000),
+  model: z.string().default("minicpm-v4.6"),
+  maxTokens: z.number().default(4096),
   temperature: z.number().default(0.3),
 });
 

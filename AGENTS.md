@@ -41,6 +41,12 @@ agents:
     files:
       - .github/agents/test-runner.agent.md
     user-invocable: true
+
+  - name: browser
+    description: "Use when you need to navigate websites, inspect UI, interact with the built-in browser, or verify web flows in GitHub Copilot."
+    files:
+      - .github/agents/browser.agent.md
+    user-invocable: true
 ---
 
 # Agentes do Vigia / SecurityAgent
@@ -51,13 +57,22 @@ Este arquivo é o **registro central de agentes** do projeto. Cada agente listad
 
 O fluxo de trabalho completo segue esta cadeia:
 
-```
+```mermaid
 main / orchestrator
   → researcher (explora codebase → Research Card)
     → planner (decompõe tarefas → Planning Card)
       → coder (implementa → auto-commit+push)
         → code-reviewer (revisa → append no card)
           → test-runner (roda testes → report)
+```
+
+### Agentes Utilitários
+
+Agentes especializados que o orquestrador aciona conforme a necessidade da feature:
+
+```mermaid
+orchestrator
+  → browser (navegação web, análise de layout, revisão visual, pesquisa online)
 ```
 
 ## Convenções
@@ -79,3 +94,4 @@ main / orchestrator
 | coder         | mistral-nemo:12b (ollama)       |
 | code-reviewer | OpenCode Go / Deepseek V4 Flash |
 | test-runner   | OpenCode Go / Deepseek V4 Flash |
+| browser       | OpenCode Go / Deepseek V4 Flash |

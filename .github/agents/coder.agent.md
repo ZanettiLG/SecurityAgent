@@ -7,11 +7,11 @@ user-invocable: true
 argument-hint: 'Forneça o slug da feature e o caminho do arquivo de planejamento. Ex: "feature-slug path/to/planning-card.md"'
 handoffs:
   - label: Review Code
-    agent: code-reviewer
+    agent: task-code-reviewer
     prompt: 'Read the Implementation Card at .github/handoff-cards/<slug>-implementation.md. Review the changes against project conventions. Append review findings to the same card.'
     send: true
   - label: Run Tests
-    agent: test-runner
+    agent: task-test-runner
     prompt: 'Run the test suite for the changed files identified in .github/handoff-cards/<slug>-implementation.md. Report results.'
     send: true
 ---

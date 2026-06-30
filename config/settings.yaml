@@ -2,7 +2,7 @@
 
 # ── System ──
 system:
-  mode: "home"  # home | away | night | vacation | business_hours
+  mode: "home" # home | away | night | vacation | business_hours
   log_level: "INFO"
   data_dir: "./data"
 
@@ -14,8 +14,10 @@ cameras:
     name: "Intelbras iM7 Full Color (Frente)"
     type: "rtsp"
     source: "rtsp://${CAM1_USER}:${CAM1_PASS}@${CAM1_IP}:${CAM1_PORT}/cam/realmonitor?channel=1&subtype=0"
-    transport: "tcp"  # Intelbras funciona com TCP
+    transport: "tcp" # Intelbras funciona com TCP
     enabled: true
+    onvifPort: 80 # ONVIF HTTP na porta 80 (WS-Security, padrao da lib)
+    onvifUseWSSecurity: true # Intelbras requer WS-Security (nao Digest/Basic)
     zones:
       - name: "entrance"
         coords: [0, 0, 640, 480]
@@ -28,8 +30,9 @@ cameras:
     name: "Yoosee (Sala)"
     type: "rtsp"
     source: "rtsp://${CAM2_USER}:${CAM2_PASS}@${CAM2_IP}:${CAM2_PORT}/${CAM2_PATH}"
-    transport: "udp"  # Yoosee exige UDP — TCP retorna "Nonmatching transport"
+    transport: "udp" # Yoosee exige UDP — TCP retorna "Nonmatching transport"
     enabled: true
+    onvifPort: 5000 # ONVIF HTTP na porta 5000 (UPnP)
     zones:
       - name: "living_room"
         coords: [0, 0, 640, 480]
@@ -44,13 +47,13 @@ audio:
   enabled: true
   devices:
     - id: "front_mic"
-      source: "rtsp_audio"  # ou "microphone"
+      source: "rtsp_audio" # ou "microphone"
       sample_rate: 16000
   processing:
     vad: true
     speaker_recognition: true
     sound_classification: true
-    speech_transcription: false  # Privacidade: desabilitado por padrão
+    speech_transcription: false # Privacidade: desabilitado por padrão
 
 # ── Vision ──
 vision:
@@ -72,10 +75,10 @@ vision:
 # ── Memory ──
 memory:
   vector_store:
-    type: "chromadb"  # chromadb | qdrant | faiss | memory
+    type: "chromadb" # chromadb | qdrant | faiss | memory
     persist_directory: "./data/vectors"
   event_store:
-    type: "sqlite"  # sqlite | postgresql
+    type: "sqlite" # sqlite | postgresql
     connection: "data/events.db"
   short_term:
     max_events: 300
@@ -93,16 +96,11 @@ goap:
 
 # ── LLM ──
 llm:
-  provider: "ollama"
-  model: "minicpm-v4.6"
-  api_key: ""
-  base_url: "http://localhost:11434"
-  max_tokens: 1000
+  base_url: "${LLM_BASE_URL:-http://localhost:11434/v1}"
+  api_key: "${LLM_API_KEY:-}"
+  model: "${LLM_MODEL:-minicpm-v4.6}"
+  max_tokens: 4096
   temperature: 0.3
-  # Alternativa OpenAI:
-  # provider: "openai"
-  # model: "gpt-4o-mini"
-  # api_key: "${OPENAI_API_KEY}"
 
 # ── Actions ──
 actions:
@@ -119,7 +117,7 @@ actions:
       enabled: false
   smart_home:
     enabled: false
-    type: "home_assistant"  # home_assistant | mqtt
+    type: "home_assistant" # home_assistant | mqtt
     url: "http://localhost:8123"
     token: "${HOME_ASSISTANT_TOKEN}"
   emergency:
@@ -139,46 +137,46 @@ vigia:
   # Reconhecimento de veiculos
   vehicles:
     enabled: true
-    model: "yolov8n"             # Modelo de deteccao
-    parking_baseline_seconds: 300  # Tempo tipico maximo (5 min)
-    ask_user_threshold_seconds: 600  # Perguntar apos 10 min
-    learn_duration: true          # Aprender duracoes tipicas
+    model: "yolov8n" # Modelo de deteccao
+    parking_baseline_seconds: 300 # Tempo tipico maximo (5 min)
+    ask_user_threshold_seconds: 600 # Perguntar apos 10 min
+    learn_duration: true # Aprender duracoes tipicas
 
   # Aprendizado de rotinas
   routines:
     enabled: true
-    learning_rate: 0.05           # Media movel exponencial
-    atypical_threshold: 0.15      # Abaixo disso = atipico
-    min_observations: 10          # Minimo para baseline confiavel
-    profile_ttl_days: 90          # Perfis expiram apos inatividade
+    learning_rate: 0.05 # Media movel exponencial
+    atypical_threshold: 0.15 # Abaixo disso = atipico
+    min_observations: 10 # Minimo para baseline confiavel
+    profile_ttl_days: 90 # Perfis expiram apos inatividade
 
   # Mineracao de padroes
   patterns:
     enabled: true
-    analysis_window_days: 60      # Janela de analise
-    min_sightings: 5              # Minimo de avistamentos
-    frequency_comparison: true    # Comparar com categorias
+    analysis_window_days: 60 # Janela de analise
+    min_sightings: 5 # Minimo de avistamentos
+    frequency_comparison: true # Comparar com categorias
 
   # Geracao de hipoteses
   hypotheses:
     enabled: true
-    auto_generate_threshold: 0.4  # Prob minima para gerar automatico
-    ask_user_threshold: 0.5       # Prob minima para perguntar ao usuario
-    max_active_hypotheses: 10     # Limite de hipoteses ativas
+    auto_generate_threshold: 0.4 # Prob minima para gerar automatico
+    ask_user_threshold: 0.5 # Prob minima para perguntar ao usuario
+    max_active_hypotheses: 10 # Limite de hipoteses ativas
 
   # Investigacao social
   social_investigation:
-    enabled: false                # Requer autorizacao explicita
-    require_authorization: true   # Sempre pedir autorizacao
-    sources: ["public_profiles"]  # Fontes permitidas
-    max_search_depth: 1           # Quantos graus de conexao investigar
+    enabled: false # Requer autorizacao explicita
+    require_authorization: true # Sempre pedir autorizacao
+    sources: ["public_profiles"] # Fontes permitidas
+    max_search_depth: 1 # Quantos graus de conexao investigar
 
   # Predicao social
   predictions:
     enabled: true
-    max_prediction_days: 7        # Horizonte maximo
+    max_prediction_days: 7 # Horizonte maximo
     default_neighborhood_size: 20 # Tamanho padrao da vizinhanca
-    gossip_factors:               # Fatores de "fofoqueirice"
+    gossip_factors: # Fatores de "fofoqueirice"
       default: 1.0
       discrete: 0.3
       gossipy: 1.5
@@ -186,7 +184,7 @@ vigia:
   # Perguntas interativas
   queries:
     enabled: true
-    max_pending_questions: 5      # Maximo de perguntas pendentes
+    max_pending_questions: 5 # Maximo de perguntas pendentes
     question_cooldown_seconds: 300 # Minimo entre perguntas (5 min)
-    tone: "informative"           # informative | casual | humoristico
-    personality: "friendly"       # professional | friendly | witty
+    tone: "informative" # informative | casual | humoristico
+    personality: "friendly" # professional | friendly | witty

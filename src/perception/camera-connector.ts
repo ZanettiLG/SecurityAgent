@@ -9,6 +9,7 @@ import type { CameraConfig } from "../core/config.js";
 import { logger } from "../core/logger.js";
 import { MockConnector } from "./mock-connector.js";
 import { RtspConnector } from "./rtsp-connector.js";
+import { OnvifConnector } from "./onvif-connector.js";
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -36,11 +37,16 @@ export interface CameraConnector {
 // ── Factory ──────────────────────────────────────────────────────
 
 export function createCameraConnector(config: CameraConfig): CameraConnector {
-  logger.info({ cameraId: config.id, type: config.type }, "Creating camera connector");
+  logger.info(
+    { cameraId: config.id, type: config.type },
+    "Creating camera connector",
+  );
 
   switch (config.type) {
     case "rtsp":
       return new RtspConnector(config);
+    case "onvif":
+      return new OnvifConnector(config);
     case "usb":
       return new MockConnector(config); // fallback — USB not implemented yet
     default:

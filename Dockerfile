@@ -7,26 +7,26 @@ RUN apk add --no-cache \
     ffmpeg \
     tini
 
-# Dependencies
+# Install all dependencies (including dev for build)
 COPY package.json package-lock.json* ./
-RUN npm ci --omit=dev
+RUN npm ci
 
-# Build
+# Build TypeScript
 COPY tsconfig.json .
 COPY src/ ./src/
 RUN npm run build
 
-# Data dirs
+# Prune dev dependencies for smaller image
+RUN npm prune --omit=dev
+
+# Config and data dirs
+COPY config/ ./config/
 RUN mkdir -p /app/data /app/recordings
 
-EXPOSE 8000
+EXPOSE 5174
 
 ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["node", "dist/core/agent.js"]
-
-# Application
-COPY src/ ./src/
-COPY config/ ./config/
 
 # Create data directories
 RUN mkdir -p /app/data /app/recordings

@@ -15,14 +15,43 @@ import {
   type ServerResponse,
 } from "node:http";
 import { readFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
 import { WebSocketServer, WebSocket } from "ws";
 import { logger } from "../core/logger.js";
 import type { EventBus } from "../core/bus.js";
+import { createApiApp } from "./app.js";
+import { setPTZCameras } from "./routes/camera-ptz.route.js";
+import type { OnvifPTZ } from "../perception/onvif-connector.js";
 
 let PORT = parseInt(process.env.DASHBOARD_PORT ?? "5174", 10);
 
-export async function createDashboardServer(bus: EventBus) {
+export async function createDashboardServer(
+  bus: EventBus,
+  ptzCameras?: Map<string, OnvifPTZ>,
+) {
+  // Setup Express PTZ routes if ONVIF cameras are available
+  let apiApp: ReturnType<typeof createApiApp> extends Promise<infer T>
+    ? T
+    : never;
+  if (ptzCameras && ptzCameras.size > 0) {
+    // Connect all ONVIF cameras (best-effort, non-blocking)
+    for (const [id, cam] of ptzCameras) {
+      if (!cam.isConnected) {
+        cam.connect().catch((err) => {
+          logger.warn(
+            { err, cameraId: id },
+            "ONVIF connection failed — PTZ may not work",
+          );
+        });
+      }
+    }
+    setPTZCameras(ptzCameras);
+    apiApp = await createApiApp();
+    logger.info(
+      { count: ptzCameras.size },
+      "PTZ API mounted in dashboard server",
+    );
+  }
+
   const server = createServer(
     async (req: IncomingMessage, res: ServerResponse) => {
       const actualPort = PORT;
@@ -48,7 +77,12 @@ export async function createDashboardServer(bus: EventBus) {
           url.pathname.startsWith("/cameras/") &&
           url.pathname.endsWith("/snapshot")
         ) {
-          const cameraId = url.pathname.split("/")[2]!;
+          const cameraId = url.pathname.split("/")[2];
+          if (!cameraId) {
+            res.writeHead(400);
+            res.end(JSON.stringify({ error: "Missing camera id" }));
+            return;
+          }
           const framePath = `data/cam_${cameraId}.jpg`;
 
           if (existsSync(framePath)) {
@@ -90,7 +124,7 @@ export async function createDashboardServer(bus: EventBus) {
 
         // ── Recent events ──
         else if (url.pathname === "/api/events/recent") {
-          const minutes = parseInt(url.searchParams.get("minutes") ?? "60");
+          parseInt(url.searchParams.get("minutes") ?? "60");
           const events = bus.getHistory("vision.event").slice(-50);
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(
@@ -114,6 +148,16 @@ export async function createDashboardServer(bus: EventBus) {
                     : "evening",
             }),
           );
+        }
+
+        // ── Camera PTZ control (delegate to Express) ──
+        else if (
+          apiApp &&
+          url.pathname.startsWith("/api/cameras/") &&
+          url.pathname.includes("/ptz/")
+        ) {
+          apiApp(req, res);
+          return; // Express handles the response asynchronously
         }
 
         // ── 404 ──

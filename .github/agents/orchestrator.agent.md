@@ -1,29 +1,37 @@
 ---
 name: orchestrator
-description: 'Master orchestrator that drives the full agent pipeline (research → planning → implementation → review → test → PR) via GitHub Issues sub-issues and autopilot Git. Activates for: handoff, pipeline, orchestrate, deploy feature, implementar feature, iniciar feature, run pipeline.'
-tools: ['read', 'search', 'edit']
+description: "Master orchestrator that drives the full agent pipeline (research → planning → implementation → review → test → PR) via GitHub Issues sub-issues and autopilot Git. Activates for: handoff, pipeline, orchestrate, deploy feature, implementar feature, iniciar feature, run pipeline."
+tools: ["read", "search", "edit"]
 user-invocable: true
 model: OpenCode Go / Deepseek V4 Pro (opencodego)
 handoffs:
   - label: Research Phase
     agent: task-researcher
-    prompt: 'Read AGENTS.md conventions. Research this feature against the Audiobooker codebase. Create a GitHub sub-issue labeled agent:research under the parent epic. Write the Research Card as the sub-issue body. Use agent-handoff.instructions.md for the template.'
+    prompt: "Read AGENTS.md conventions. Research this feature against the Audiobooker codebase. Create a GitHub sub-issue labeled agent:research under the parent epic. Write the Research Card as the sub-issue body. Use agent-handoff.instructions.md for the template."
     send: true
   - label: Planning Phase
     agent: task-planner
-    prompt: 'Read the Research Card from the GitHub sub-issue (agent:research). Create a new GitHub sub-issue labeled agent:planning under the same parent epic. Write the Planning Card as the sub-issue body. Trust the research — do NOT re-explore the codebase.'
+    prompt: "Read the Research Card from the GitHub sub-issue (agent:research). Create a new GitHub sub-issue labeled agent:planning under the same parent epic. Write the Planning Card as the sub-issue body. Trust the research — do NOT re-explore the codebase."
     send: true
   - label: Implementation Phase
     agent: task-coder
-    prompt: 'Read the Planning Card from the GitHub sub-issue (agent:planning). Implement each task — auto-commit, auto-push, then auto-delegate to code-reviewer and test-runner. Create a GitHub sub-issue labeled agent:implementation for the implementation log.'
+    prompt: "Read the Planning Card from the GitHub sub-issue (agent:planning). Implement each task — auto-commit, auto-push, then auto-delegate to code-reviewer and test-runner. Create a GitHub sub-issue labeled agent:implementation for the implementation log."
     send: true
   - label: Review Phase
     agent: task-code-reviewer
-    prompt: 'Read the Implementation Card from the GitHub sub-issue (agent:implementation). Review the changes against project conventions. Append review findings as a comment on the same sub-issue.'
+    prompt: "Read the Implementation Card from the GitHub sub-issue (agent:implementation). Review the changes against project conventions. Append review findings as a comment on the same sub-issue."
     send: true
   - label: Test Phase
     agent: task-test-runner
-    prompt: 'Run the test suite for the changed files identified in the implementation sub-issue. Report results as a comment on the sub-issue.'
+    prompt: "Run the test suite for the changed files identified in the implementation sub-issue. Report results as a comment on the sub-issue."
+    send: true
+  - label: Browser / UI Verification
+    agent: task-browser
+    prompt: "Open the target URL or page in the built-in browser. If a reference image or layout spec is provided, compare the rendered page against it using the browser-layout-analysis and browser-visual-review skills. Report layout issues, visual mismatches, and UX problems."
+    send: true
+  - label: Web Research
+    agent: task-browser
+    prompt: "Navigate to the specified URL and extract the relevant information. Summarize the content, structure, and key findings. Capture screenshots if visual evidence is needed."
     send: true
 ---
 
