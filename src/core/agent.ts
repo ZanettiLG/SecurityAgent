@@ -54,6 +54,7 @@ import {
 import { KnowledgeGraph } from "../memory/knowledge-graph.js";
 import { SocialMediaInvestigator } from "../processing/social-investigator.js";
 import { createDefaultSceneContext } from "../memory/scene-context-store.js";
+import { ConsolidationEngine } from "../memory/consolidation.js";
 import type { SceneContext } from "../core/types.js";
 
 // ── Agent ────────────────────────────────────────────────────────
@@ -87,6 +88,7 @@ export class SecurityAgent {
   knowledgeGraph: KnowledgeGraph | null = null;
   retrospectiveAnalyzer: RetrospectiveAnalyzer | null = null;
   sceneContexts: Map<string, SceneContext> = new Map();
+  consolidationEngine: ConsolidationEngine | null = null;
 
   // Timing
   private tickInterval: ReturnType<typeof setInterval> | null = null;
@@ -253,11 +255,6 @@ export class SecurityAgent {
       void this.goapTick();
     }, goapInterval);
 
-    // Consolidação de memória (a cada 1h)
-    setInterval(() => {
-      void this.consolidateMemory();
-    }, 3_600_000);
-
     // Vigia: observação contínua (a cada 60s)
     setInterval(() => {
       void this.vigiaObserve();
@@ -267,6 +264,14 @@ export class SecurityAgent {
     setInterval(() => {
       void this.processPendingQueries();
     }, 5_000);
+
+    // Consolidation engine (Issue #1 — auto-aprendizado contínuo)
+    this.consolidationEngine = new ConsolidationEngine(
+      this.memory!,
+      this.llmClient ?? undefined,
+      { intervalMs: 300_000 }, // every 5 minutes
+    );
+    this.consolidationEngine.start();
 
     logger.info("Agent loop started");
 
