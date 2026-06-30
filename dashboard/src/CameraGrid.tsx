@@ -59,7 +59,6 @@ function CameraCard({
 
   useEffect(() => {
     if (!cam.online) return;
-    setTick((t) => t + 1);
     timerRef.current = setInterval(() => setTick((t) => t + 1), 2000);
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);

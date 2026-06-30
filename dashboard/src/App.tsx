@@ -46,53 +46,72 @@ interface MotionSummary {
 }
 
 let msgCounter = 0;
-function nextMsgId() { return `msg_${++msgCounter}_${Date.now()}`; }
+function nextMsgId() {
+  return `msg_${++msgCounter}_${Date.now()}`;
+}
 
 /** Deduplicate events within 3s window by eventType + cameraId */
 const DEDUP_WINDOW_MS = 3000;
 
 function App() {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [events, setEvents] = useState<Array<{ description: string; timestamp: Date; severity: number; cameraId: string }>>([]);
+  const [events, setEvents] = useState<
+    Array<{
+      description: string;
+      timestamp: Date;
+      severity: number;
+      cameraId: string;
+    }>
+  >([]);
   const [connected, setConnected] = useState(false);
   const [activeAlerts, setActiveAlerts] = useState<ActiveAlert[]>([]);
-  const [motionSummary, setMotionSummary] = useState<Map<string, MotionSummary>>(new Map());
-  const [identifyVehicle, setIdentifyVehicle] = useState<{ alertId: string; cameraId: string; snapshotPath?: string; description: string } | null>(null);
+  const [motionSummary, setMotionSummary] = useState<
+    Map<string, MotionSummary>
+  >(new Map());
+  const [identifyVehicle, setIdentifyVehicle] = useState<{
+    alertId: string;
+    cameraId: string;
+    snapshotPath?: string;
+    description: string;
+  } | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const lastEventRef = useRef<Map<string, number>>(new Map());
 
   // Group motion events into summaries instead of flooding chat
-  const handleMotionEvent = useCallback((p: Record<string, unknown>, cameraId: string) => {
-    const now = new Date();
-    const changeRatio = (p.changeRatio as number) ?? 0;
+  const handleMotionEvent = useCallback(
+    (p: Record<string, unknown>, cameraId: string) => {
+      const now = new Date();
+      const changeRatio = (p.changeRatio as number) ?? 0;
 
-    setMotionSummary((prev) => {
-      const next = new Map(prev);
-      const existing = next.get(cameraId);
-      if (existing) {
-        const total = existing.avgChangeRatio * existing.count + changeRatio;
-        const newCount = existing.count + 1;
-        next.set(cameraId, {
-          count: newCount,
-          lastChangeRatio: changeRatio,
-          avgChangeRatio: total / newCount,
-          cameraId,
-          firstAt: existing.firstAt,
-          lastAt: now,
-        });
-      } else {
-        next.set(cameraId, {
-          count: 1,
-          lastChangeRatio: changeRatio,
-          avgChangeRatio: changeRatio,
-          cameraId,
-          firstAt: now,
-          lastAt: now,
-        });
-      }
-      return next;
-    });
-  }, []);
+      setMotionSummary((prev) => {
+        const next = new Map(prev);
+        const existing = next.get(cameraId);
+        if (existing) {
+          const total = existing.avgChangeRatio * existing.count + changeRatio;
+          const newCount = existing.count + 1;
+          next.set(cameraId, {
+            count: newCount,
+            lastChangeRatio: changeRatio,
+            avgChangeRatio: total / newCount,
+            cameraId,
+            firstAt: existing.firstAt,
+            lastAt: now,
+          });
+        } else {
+          next.set(cameraId, {
+            count: 1,
+            lastChangeRatio: changeRatio,
+            avgChangeRatio: changeRatio,
+            cameraId,
+            firstAt: now,
+            lastAt: now,
+          });
+        }
+        return next;
+      });
+    },
+    [],
+  );
 
   useEffect(() => {
     const ws = new WebSocket(`ws://${window.location.host}/ws`);
@@ -102,16 +121,23 @@ function App() {
     ws.onclose = () => {
       setConnected(false);
       // Reconnect after 3s
-      setTimeout(() => { if (!wsRef.current || wsRef.current.readyState === WebSocket.CLOSED) {
-        // Will re-trigger this effect
-      }}, 3000);
+      setTimeout(() => {
+        if (!wsRef.current || wsRef.current.readyState === WebSocket.CLOSED) {
+          // Will re-trigger this effect
+        }
+      }, 3000);
     };
 
     ws.onmessage = (e) => {
       try {
         const msg: VigiaMessage = JSON.parse(e.data);
 
-        if (msg.type === "event" && msg.topic === "vision.event" && msg.payload && "eventType" in msg.payload) {
+        if (
+          msg.type === "event" &&
+          msg.topic === "vision.event" &&
+          msg.payload &&
+          "eventType" in msg.payload
+        ) {
           const p = msg.payload as Record<string, unknown>;
           const sev = (p.severity as number) ?? 0;
           const eventType = p.eventType as string;
@@ -121,7 +147,10 @@ function App() {
           // ── Dedup: skip same eventType+cameraId within window ──
           const dedupKey = `${eventType}:${cameraId}`;
           const lastTime = lastEventRef.current.get(dedupKey) ?? 0;
-          if (now - lastTime < DEDUP_WINDOW_MS && eventType === "motion_detected") {
+          if (
+            now - lastTime < DEDUP_WINDOW_MS &&
+            eventType === "motion_detected"
+          ) {
             // Still count in summary but don't create new message
             if (eventType === "motion_detected") handleMotionEvent(p, cameraId);
             return;
@@ -133,16 +162,27 @@ function App() {
             handleMotionEvent(p, cameraId);
             // Still add to timeline
             setEvents((prev) => [
-              { description: (p.description as string) || "Movimento detectado", timestamp: new Date(), severity: sev, cameraId },
+              {
+                description: (p.description as string) || "Movimento detectado",
+                timestamp: new Date(),
+                severity: sev,
+                cameraId,
+              },
               ...prev.slice(0, 99),
             ]);
             return;
           }
 
           // ── Vehicle / Person detection → prominent alert ──
-          if (eventType === "vehicle_detected" || eventType === "person_detected") {
+          if (
+            eventType === "vehicle_detected" ||
+            eventType === "person_detected"
+          ) {
             const alertId = nextMsgId();
-            const snapshotPath = (p.snapshotPath as string) || (p.framePath as string) || undefined;
+            const snapshotPath =
+              (p.snapshotPath as string) ||
+              (p.framePath as string) ||
+              undefined;
 
             const alert: ActiveAlert = {
               id: alertId,
@@ -155,16 +195,26 @@ function App() {
             };
             setActiveAlerts((prev) => [alert, ...prev.slice(0, 9)]);
 
-            const quickReplies = eventType === "vehicle_detected"
-              ? [
-                  { label: "🚗 É o meu carro", value: "É o meu carro" },
-                  { label: "👤 É a pessoa: ___", value: "É a dona/neighbora " },
-                  { label: "❌ Não reconheço", value: "Não reconheço esse veículo" },
-                ]
-              : [
-                  { label: "👤 Conheço: ___", value: "Conheço essa pessoa: " },
-                  { label: "❌ Desconhecido", value: "Pessoa desconhecida" },
-                ];
+            const quickReplies =
+              eventType === "vehicle_detected"
+                ? [
+                    { label: "🚗 É o meu carro", value: "É o meu carro" },
+                    {
+                      label: "👤 É a pessoa: ___",
+                      value: "É a dona/neighbora ",
+                    },
+                    {
+                      label: "❌ Não reconheço",
+                      value: "Não reconheço esse veículo",
+                    },
+                  ]
+                : [
+                    {
+                      label: "👤 Conheço: ___",
+                      value: "Conheço essa pessoa: ",
+                    },
+                    { label: "❌ Desconhecido", value: "Pessoa desconhecida" },
+                  ];
 
             setMessages((prev) => [
               ...prev.slice(-199),
@@ -184,31 +234,50 @@ function App() {
 
           // ── All events → timeline ──
           setEvents((prev) => [
-            { description: (p.description as string) || "", timestamp: new Date(), severity: sev, cameraId },
+            {
+              description: (p.description as string) || "",
+              timestamp: new Date(),
+              severity: sev,
+              cameraId,
+            },
             ...prev.slice(0, 99),
           ]);
         }
 
         if (msg.type === "connected") {
-          setMessages((prev) => [...prev, {
-            id: nextMsgId(),
-            text: "✅ Vigia conectado — monitoramento ativo",
-            type: "info",
-            timestamp: new Date(),
-          }]);
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: nextMsgId(),
+              text: "✅ Vigia conectado — monitoramento ativo",
+              type: "info",
+              timestamp: new Date(),
+            },
+          ]);
         }
 
         // ── User answer confirmation ──
-        if (msg.type === "event" && msg.topic === "user.answer" && msg.payload) {
+        if (
+          msg.type === "event" &&
+          msg.topic === "user.answer" &&
+          msg.payload
+        ) {
           const p = msg.payload as Record<string, unknown>;
           if (p.insight) {
             setMessages((prev) => [
               ...prev.slice(-199),
-              { id: nextMsgId(), text: `📝 ${(p.insight as string)}`, type: "insight", timestamp: new Date() },
+              {
+                id: nextMsgId(),
+                text: `📝 ${p.insight as string}`,
+                type: "insight",
+                timestamp: new Date(),
+              },
             ]);
           }
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     };
 
     return () => ws.close();
@@ -216,59 +285,115 @@ function App() {
 
   const handleReply = useCallback((messageId: string, answer: string) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({
-        type: "chat_response", messageId, answer, timestamp: new Date().toISOString(),
-      }));
-      setMessages((prev) => [...prev, { id: nextMsgId(), text: `👤 ${answer}`, type: "info", timestamp: new Date() }]);
+      wsRef.current.send(
+        JSON.stringify({
+          type: "chat_response",
+          messageId,
+          answer,
+          timestamp: new Date().toISOString(),
+        }),
+      );
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: nextMsgId(),
+          text: `👤 ${answer}`,
+          type: "info",
+          timestamp: new Date(),
+        },
+      ]);
       // Remove from active alerts
       setActiveAlerts((prev) => prev.filter((a) => a.id !== messageId));
     }
   }, []);
 
-  const handleQuickReply = useCallback((messageId: string, value: string) => {
-    handleReply(messageId, value);
-  }, [handleReply]);
+  const handleQuickReply = useCallback(
+    (messageId: string, value: string) => {
+      handleReply(messageId, value);
+    },
+    [handleReply],
+  );
 
-  const handleIdentify = useCallback((cameraId: string, identification: string) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({
-        type: "chat_response",
-        messageId: `identify_${Date.now()}`,
-        answer: identification,
-        timestamp: new Date().toISOString(),
-        cameraId,
-      }));
-      setMessages((prev) => [...prev, { id: nextMsgId(), text: `👤 ${identification}`, type: "info", timestamp: new Date() }]);
-    }
-    setIdentifyVehicle(null);
-  }, []);
-
-  // Dismiss an active alert
-  const dismissAlert = useCallback((alertId: string) => {
-    setActiveAlerts((prev) => prev.filter((a) => a.id !== alertId));
-  }, []);
+  const handleIdentify = useCallback(
+    (cameraId: string, identification: string) => {
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(
+          JSON.stringify({
+            type: "chat_response",
+            messageId: `identify_${Date.now()}`,
+            answer: identification,
+            timestamp: new Date().toISOString(),
+            cameraId,
+          }),
+        );
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: nextMsgId(),
+            text: `👤 ${identification}`,
+            type: "info",
+            timestamp: new Date(),
+          },
+        ]);
+      }
+      setIdentifyVehicle(null);
+    },
+    [],
+  );
 
   // Aggregate motion summary for display
   const motionEntries = Array.from(motionSummary.values());
 
   return (
-    <div style={{
-      height: "100vh", display: "flex", flexDirection: "column",
-      backgroundColor: "#0a0e17", color: "#c8d6e5",
-      fontFamily: "'Segoe UI', system-ui, sans-serif", overflow: "hidden",
-    }}>
-      <header style={{
-        padding: "8px 20px", backgroundColor: "#111827",
-        display: "flex", alignItems: "center", gap: 16,
-        borderBottom: "1px solid #1e293b", flexShrink: 0,
-      }}>
-        <span style={{ color: "#ef4444", fontWeight: 700, fontSize: 14, letterSpacing: 1 }}>🔴 AO VIVO</span>
-        <span style={{ fontWeight: 600, fontSize: 15, flex: 1 }}>Vigia — Central de Segurança</span>
-        <span style={{ color: "#64748b", fontSize: 13 }}>{new Date().toLocaleTimeString()}</span>
+    <div
+      style={{
+        height: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        backgroundColor: "#0a0e17",
+        color: "#c8d6e5",
+        fontFamily: "'Segoe UI', system-ui, sans-serif",
+        overflow: "hidden",
+      }}
+    >
+      <header
+        style={{
+          padding: "8px 20px",
+          backgroundColor: "#111827",
+          display: "flex",
+          alignItems: "center",
+          gap: 16,
+          borderBottom: "1px solid #1e293b",
+          flexShrink: 0,
+        }}
+      >
+        <span
+          style={{
+            color: "#ef4444",
+            fontWeight: 700,
+            fontSize: 14,
+            letterSpacing: 1,
+          }}
+        >
+          🔴 AO VIVO
+        </span>
+        <span style={{ fontWeight: 600, fontSize: 15, flex: 1 }}>
+          Vigia — Central de Segurança
+        </span>
+        <span style={{ color: "#64748b", fontSize: 13 }}>
+          {new Date().toLocaleTimeString()}
+        </span>
       </header>
 
       <main style={{ flex: 1, display: "flex", overflow: "hidden" }}>
-        <div style={{ flex: 1, padding: 12, overflow: "auto", position: "relative" }}>
+        <div
+          style={{
+            flex: 1,
+            padding: 12,
+            overflow: "auto",
+            position: "relative",
+          }}
+        >
           <CameraGrid
             activeAlerts={activeAlerts}
             motionSummary={motionEntries}
@@ -286,10 +411,16 @@ function App() {
             }}
           />
         </div>
-        <div style={{
-          width: 400, display: "flex", flexDirection: "column",
-          borderLeft: "1px solid #1e293b", backgroundColor: "#0f172a", flexShrink: 0,
-        }}>
+        <div
+          style={{
+            width: 400,
+            display: "flex",
+            flexDirection: "column",
+            borderLeft: "1px solid #1e293b",
+            backgroundColor: "#0f172a",
+            flexShrink: 0,
+          }}
+        >
           <ChatPanel
             messages={messages}
             connected={connected}
@@ -313,7 +444,12 @@ function App() {
         </div>
       </main>
 
-      <StatusBar connected={connected} eventsCount={events.length} camerasOnline={1} threats={0} />
+      <StatusBar
+        connected={connected}
+        eventsCount={events.length}
+        camerasOnline={1}
+        threats={0}
+      />
 
       {identifyVehicle && (
         <VehicleIdentifyModal

@@ -13,23 +13,35 @@ interface Props {
 const QUICK_OPTIONS = [
   { icon: "🚗", label: "É o meu carro", value: "É o meu carro" },
   { icon: "👤", label: "Conheço essa pessoa", value: "Conheço essa pessoa: " },
-  { icon: "📦", label: "Entrega / Encomenda", value: "É uma entrega/encomenda" },
+  {
+    icon: "📦",
+    label: "Entrega / Encomenda",
+    value: "É uma entrega/encomenda",
+  },
   { icon: "🔧", label: "Serviço / Manutenção", value: "É serviço/manutenção" },
   { icon: "❌", label: "Não reconheço", value: "Não reconheço" },
 ];
 
 // ── Component ──
 
-function VehicleIdentifyModal({ cameraId, snapshotPath, description, onIdentify, onClose }: Props) {
+function VehicleIdentifyModal({
+  cameraId,
+  description,
+  onIdentify,
+  onClose,
+}: Props) {
   const [customText, setCustomText] = useState("");
   const [showCustom, setShowCustom] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const snapshotUrl = `/cameras/${cameraId}/snapshot?t=${Date.now()}`;
+  const [snapshotTs] = useState(() => Date.now());
+  const snapshotUrl = `/cameras/${cameraId}/snapshot?t=${snapshotTs}`;
 
   // Close on Escape
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
@@ -58,24 +70,32 @@ function VehicleIdentifyModal({ cameraId, snapshotPath, description, onIdentify,
     <div
       onClick={onClose}
       style={{
-        position: "fixed", inset: 0, zIndex: 1000,
+        position: "fixed",
+        inset: 0,
+        zIndex: 1000,
         backgroundColor: "rgba(0,0,0,0.7)",
-        display: "flex", alignItems: "center", justifyContent: "center",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
         backdropFilter: "blur(4px)",
       }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          backgroundColor: "#111827", borderRadius: 12,
+          backgroundColor: "#111827",
+          borderRadius: 12,
           border: "1px solid #1e293b",
-          maxWidth: 480, width: "90%",
+          maxWidth: 480,
+          width: "90%",
           boxShadow: "0 25px 60px rgba(0,0,0,0.5)",
           overflow: "hidden",
         }}
       >
         {/* ── Camera Snapshot ── */}
-        <div style={{ position: "relative", backgroundColor: "#000", height: 240 }}>
+        <div
+          style={{ position: "relative", backgroundColor: "#000", height: 240 }}
+        >
           <img
             src={snapshotUrl}
             alt={`Câmera ${cameraId}`}
@@ -84,20 +104,37 @@ function VehicleIdentifyModal({ cameraId, snapshotPath, description, onIdentify,
               (e.target as HTMLImageElement).style.display = "none";
             }}
           />
-          <div style={{
-            position: "absolute", top: 0, left: 0, right: 0,
-            background: "linear-gradient(rgba(0,0,0,0.7), transparent)",
-            padding: "12px 16px",
-          }}>
-            <div style={{ fontSize: 10, color: "#6b7280", textTransform: "uppercase", letterSpacing: 1 }}>
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              background: "linear-gradient(rgba(0,0,0,0.7), transparent)",
+              padding: "12px 16px",
+            }}
+          >
+            <div
+              style={{
+                fontSize: 10,
+                color: "#6b7280",
+                textTransform: "uppercase",
+                letterSpacing: 1,
+              }}
+            >
               📷 Câmera {cameraId}
             </div>
           </div>
-          <div style={{
-            position: "absolute", bottom: 0, left: 0, right: 0,
-            background: "linear-gradient(transparent, rgba(0,0,0,0.8))",
-            padding: "20px 16px 10px",
-          }}>
+          <div
+            style={{
+              position: "absolute",
+              bottom: 0,
+              left: 0,
+              right: 0,
+              background: "linear-gradient(transparent, rgba(0,0,0,0.8))",
+              padding: "20px 16px 10px",
+            }}
+          >
             <div style={{ fontSize: 14, fontWeight: 600, color: "#f8fafc" }}>
               {description}
             </div>
@@ -117,20 +154,34 @@ function VehicleIdentifyModal({ cameraId, snapshotPath, description, onIdentify,
                 onClick={() => handleSelect(opt.value)}
                 disabled={selected !== null}
                 style={{
-                  display: "flex", alignItems: "center", gap: 10,
-                  padding: "10px 12px", borderRadius: 8,
-                  border: selected === opt.value ? "1px solid #3b82f6" : "1px solid #1e293b",
-                  backgroundColor: selected === opt.value ? "rgba(59,130,246,0.15)" : "#0f172a",
-                  color: "#e2e8f0", fontSize: 13, cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "10px 12px",
+                  borderRadius: 8,
+                  border:
+                    selected === opt.value
+                      ? "1px solid #3b82f6"
+                      : "1px solid #1e293b",
+                  backgroundColor:
+                    selected === opt.value
+                      ? "rgba(59,130,246,0.15)"
+                      : "#0f172a",
+                  color: "#e2e8f0",
+                  fontSize: 13,
+                  cursor: "pointer",
                   transition: "all 0.2s",
                   opacity: selected && selected !== opt.value ? 0.4 : 1,
                   textAlign: "left",
                 }}
                 onMouseEnter={(e) => {
-                  if (!selected) e.currentTarget.style.backgroundColor = "rgba(59,130,246,0.1)";
+                  if (!selected)
+                    e.currentTarget.style.backgroundColor =
+                      "rgba(59,130,246,0.1)";
                 }}
                 onMouseLeave={(e) => {
-                  if (!selected) e.currentTarget.style.backgroundColor = "#0f172a";
+                  if (!selected)
+                    e.currentTarget.style.backgroundColor = "#0f172a";
                 }}
               >
                 <span style={{ fontSize: 18 }}>{opt.icon}</span>
@@ -146,21 +197,32 @@ function VehicleIdentifyModal({ cameraId, snapshotPath, description, onIdentify,
                 ref={inputRef}
                 value={customText}
                 onChange={(e) => setCustomText(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") handleCustomSubmit(); }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleCustomSubmit();
+                }}
                 placeholder="Descreva..."
                 style={{
-                  flex: 1, padding: "8px 12px", borderRadius: 6,
+                  flex: 1,
+                  padding: "8px 12px",
+                  borderRadius: 6,
                   border: "1px solid #3b82f6",
-                  backgroundColor: "#1e293b", color: "#e2e8f0",
-                  fontSize: 13, outline: "none",
+                  backgroundColor: "#1e293b",
+                  color: "#e2e8f0",
+                  fontSize: 13,
+                  outline: "none",
                 }}
               />
               <button
                 onClick={handleCustomSubmit}
                 style={{
-                  padding: "8px 16px", borderRadius: 6, border: "none",
-                  backgroundColor: "#3b82f6", color: "#fff",
-                  fontSize: 12, cursor: "pointer", fontWeight: 500,
+                  padding: "8px 16px",
+                  borderRadius: 6,
+                  border: "none",
+                  backgroundColor: "#3b82f6",
+                  color: "#fff",
+                  fontSize: 12,
+                  cursor: "pointer",
+                  fontWeight: 500,
                 }}
               >
                 Confirmar
@@ -173,8 +235,11 @@ function VehicleIdentifyModal({ cameraId, snapshotPath, description, onIdentify,
             <button
               onClick={onClose}
               style={{
-                background: "none", border: "none",
-                color: "#6b7280", fontSize: 11, cursor: "pointer",
+                background: "none",
+                border: "none",
+                color: "#6b7280",
+                fontSize: 11,
+                cursor: "pointer",
                 padding: "4px 8px",
               }}
             >
