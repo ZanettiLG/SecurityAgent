@@ -4,14 +4,15 @@
 
 O sistema de memória é o que torna o SecurityAgent "inteligente" ao longo do tempo. Ele implementa um modelo inspirado na memória humana:
 
-| Tipo | Duração | Capacidade | Função |
-|------|---------|------------|--------|
-| **Memória Sensorial** | ~5 segundos | Ilimitada (buffer circular) | Últimos frames de vídeo/áudio para contexto imediato |
-| **Memória de Curto Prazo (STM)** | ~5-30 minutos | ~300 eventos | Eventos recentes para detecção de padrões de curto prazo |
-| **Memória de Longo Prazo (LTM)** | Indefinido | Ilimitada (com compressão) | Histórico, padrões, pessoas conhecidas |
-| **Memória Vetorial** | Indefinido | Ilimitada | Embeddings de rostos e vozes para matching |
-| **Memória Episódica** | Indefinido | Ilimitada | Eventos específicos com contexto rico |
-| **Memória Semântica** | Indefinido | Ilimitada | Fatos, regras, conhecimento sobre pessoas |
+| Tipo                             | Duração       | Capacidade                  | Função                                                                                   |
+| -------------------------------- | ------------- | --------------------------- | ---------------------------------------------------------------------------------------- |
+| **Memória Sensorial**            | ~5 segundos   | Ilimitada (buffer circular) | Últimos frames de vídeo/áudio para contexto imediato                                     |
+| **Memória de Curto Prazo (STM)** | ~5-30 minutos | ~300 eventos                | Eventos recentes para detecção de padrões de curto prazo                                 |
+| **Memória de Longo Prazo (LTM)** | Indefinido    | Ilimitada (com compressão)  | Histórico consolidado, padrões, pessoas conhecidas, conhecimento acumulado entre sessões |
+| **Memória Vetorial**             | Indefinido    | Ilimitada                   | Embeddings de rostos, vozes e cenas para matching                                        |
+| **Memória Episódica**            | Indefinido    | Ilimitada                   | Eventos específicos com contexto rico (SceneObservation)                                 |
+| **Memória Semântica**            | Indefinido    | Ilimitada                   | Fatos, regras, conhecimento sobre pessoas, relacionamentos                               |
+| **Memória de Contexto**          | Indefinido    | Ilimitada                   | Contexto de cena por câmera, conhecimento "instintivo" do ambiente                       |
 
 ---
 
@@ -307,7 +308,140 @@ class ShortTermMemory:
 
 ---
 
-## 6. Memória de Longo Prazo & Consolidação
+## 6. Memória de Contexto de Cena (Scene Context Store)
+
+> **Novo**: Issue [#1](https://github.com/ZanettiLG/SecurityAgent/issues/1) — Fase 2
+
+### 6.1 Conceito
+
+A Memória de Contexto de Cena armazena o **modelo mental do ambiente** que o
+agente constrói sobre cada câmera. É o que permite ao Vigia "saber" o que
+está vendo sem precisar reanalisar cada frame do zero.
+
+Diferente das outras memórias que armazenam eventos ou embeddings, o Scene
+Context armazena **descrições persistentes e em evolução** do ambiente físico:
+
+```
+Câmera "externa_portao":
+  ├── Descrição inicial (fornecida pelo usuário ou inferida por LLM Vision):
+  │     "Câmera na área externa da residência, apontada para o portão.
+  │      Vê: carro na garagem, portão de ferro, rua asfaltada,
+  │      5 casas do outro lado, árvore na calçada."
+  │
+  ├── Residentes associados: ["João", "Maria"]
+  ├── Veículos dos residentes: ["Gol branco ABC-1234", "HB20 prata DEF-5678"]
+  ├── Zonas de interesse:
+  │     - portão (entrada principal)
+  │     - garagem (área interna)
+  │     - rua (área pública)
+  │     - calçada (transição)
+  │
+  └── Conhecimento adquirido (evolui com observações):
+        - "Vizinha Fulana mora na casa azul à esquerda"
+        - "Carteiro passa entre 10h-11h"
+        - "Caminhão de gás toda terça-feira"
+```
+
+### 6.2 Estrutura de Dados
+
+```typescript
+interface SceneContext {
+  cameraId: string;
+  createdAt: Date;
+  updatedAt: Date;
+
+  // Descrição da cena
+  description: string; // "Câmera externa, vê portão, rua, casas..."
+  spatialLayout: string; // "Portão a 3m, rua a 8m, casas a 15m+"
+
+  // Entidades conhecidas neste campo de visão
+  knownPersons: string[]; // personIds de residentes e vizinhos
+  knownVehicles: string[]; // vehicleIds associados
+  zones: SceneZone[]; // Zonas de interesse na cena
+
+  // Conhecimento adquirido (auto-aprendizado)
+  acquiredFacts: AcquiredFact[]; // Fatos descobertos pelo agente
+  confidence: number; // 0..1 — o quanto o agente confia neste modelo
+}
+
+interface SceneZone {
+  name: string; // "portão", "garagem", "rua"
+  type: "private" | "transition" | "public";
+  description: string;
+  distanceEstimateM?: number;
+}
+
+interface AcquiredFact {
+  fact: string; // "Vizinha Fulana mora na casa azul"
+  source: "user" | "llm_vision" | "inference" | "observation";
+  confidence: number;
+  discoveredAt: Date;
+  validatedAt?: Date; // Quando foi confirmado pelo usuário
+}
+```
+
+### 6.3 Fluxo de Bootstrapping
+
+```
+1. CÂMERA NOVA DETECTADA
+   └─► SceneContextStore cria registro vazio com status "uninitialized"
+
+2. PRIMEIRO FRAME — LLM Vision descreve a cena:
+   ┌─────────────────────────────────────────────────────────┐
+   │ Prompt: "Descreva esta cena de câmera de segurança.     │
+   │          O que você vê? Quais zonas (portão, rua, etc)? │
+   │          Há veículos? De que cores/modelos?"             │
+   │                                                         │
+   │ Resposta: "Vejo um portão de ferro preto, um carro      │
+   │           branco (Gol) estacionado na garagem, uma rua  │
+   │           asfaltada com 5 casas visíveis..."             │
+   └─────────────────────────────────────────────────────────┘
+
+3. USUÁRIO VALIDA/EDITA:
+   └─► "O carro branco é meu Gol. A casa azul é da vizinha Fulana."
+
+4. SCENE CONTEXT ATIVO:
+   └─► Agora o agente "sabe" o que cada câmera vê.
+       Este contexto é injetado no prompt do LLM em toda avaliação.
+```
+
+### 6.4 Atualização Contínua
+
+O SceneContext **evolui** com o tempo. O agente adiciona `AcquiredFacts`
+conforme aprende:
+
+```
+Evento: "Motorista desconhecido estaciona em frente à casa azul"
+  → Agente consulta SceneContext: "casa azul = vizinha Fulana"
+  → Agente infere: "Motorista pode ser associado à Fulana"
+  → Se confirmado (pelo usuário ou por repetição), adiciona:
+      AcquiredFact {
+        fact: "Fulana recebe visitas de motorista (~34 anos, homem)",
+        source: "inference",
+        confidence: 0.7
+      }
+```
+
+### 6.5 Persistência
+
+```sql
+CREATE TABLE scene_contexts (
+  camera_id TEXT PRIMARY KEY,
+  description TEXT NOT NULL DEFAULT '',
+  spatial_layout TEXT DEFAULT '',
+  known_persons TEXT DEFAULT '[]',     -- JSON array
+  known_vehicles TEXT DEFAULT '[]',    -- JSON array
+  zones TEXT DEFAULT '[]',             -- JSON array of SceneZone
+  acquired_facts TEXT DEFAULT '[]',    -- JSON array of AcquiredFact
+  confidence REAL DEFAULT 0.5,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+```
+
+---
+
+## 7. Memória de Longo Prazo & Consolidação
 
 ```python
 class LongTermMemory:
@@ -379,7 +513,7 @@ class LongTermMemory:
 
 ---
 
-## 7. Detecção de Anomalias
+## 8. Detecção de Anomalias
 
 ```python
 class AnomalyDetector:
@@ -442,7 +576,115 @@ class AnomalyDetector:
 
 ---
 
-## 8. Grafo de Conhecimento
+## 8.5. Context Compiler — Montagem Hierárquica de Contexto para LLM
+
+> **Novo**: Issue [#1](https://github.com/ZanettiLG/SecurityAgent/issues/1) — Fase 3
+
+### Conceito
+
+O Context Compiler é o componente que monta o prompt do agente de forma
+**hierárquica e com priorização**, garantindo que o LLM receba todas as
+informações relevantes sem estourar o token budget.
+
+### Arquitetura em Camadas
+
+```
+┌─────────────────────────────────────────────┐
+│ SYSTEM PROMPT (fixo)                         │
+│ "Você é o Vigia, um agente de segurança..."  │
+├─────────────────────────────────────────────┤
+│ SCENE CONTEXT (persistente)                  │
+│ "Câmera externa: vê portão, rua, casas..."   │
+│ "Residentes: João, Maria"                    │
+│ "Veículos residentes: Gol branco, HB20"      │
+├─────────────────────────────────────────────┤
+│ KNOWLEDGE GRAPH CONTEXT (entidades relev.)   │
+│ "Entidades detectadas neste evento:"         │
+│ "  - Pessoa X: vizinha, 23 visitas, ..."     │
+│ "  - Carro Y: associado a Pessoa X, ..."     │
+├─────────────────────────────────────────────┤
+│ ROUTINE CONTEXT (baselines aprendidas)       │
+│ "Neste horário (14h), nesta câmera:"         │
+│ "  - 85% dos eventos são entregas"           │
+│ "  - 10% são visitas de vizinhos"            │
+├─────────────────────────────────────────────┤
+│ RECENT EVENTS (janela deslizante)            │
+│ "Últimos 20 eventos relevantes..."           │
+├─────────────────────────────────────────────┤
+│ ACTIVE HYPOTHESES                            │
+│ "Hipóteses em aberto sobre entidades..."     │
+├─────────────────────────────────────────────┤
+│ CONVERSATION HISTORY (últimas interações)    │
+│ "Perguntas recentes e respostas..."          │
+└─────────────────────────────────────────────┘
+```
+
+### Princípios de Design
+
+| Princípio                     | Descrição                                                                       |
+| ----------------------------- | ------------------------------------------------------------------------------- |
+| **Hierarquia de importância** | Scene Context > KG > Routines > Events > Hypotheses > Conversations             |
+| **Token budget consciente**   | Cada camada tem um limite de tokens; informações menos relevantes são truncadas |
+| **Relevância por entidade**   | Se o evento é sobre pessoa X, o KG context foca em X e seus vizinhos no grafo   |
+| **Compressão de histórico**   | Eventos antigos são sumarizados pelo LLM em "memórias compactas"                |
+| **Cache inteligente**         | Scene Context e Routine Profiles mudam pouco → cacheados; Events mudam sempre   |
+
+### Implementação
+
+```typescript
+interface ContextLayer {
+  name: string;
+  priority: number; // 0 (mais importante) a 100
+  maxTokens: number; // Budget máximo desta camada
+  build(event: SecurityEvent): Promise<string>;
+}
+
+class ContextCompiler {
+  private layers: ContextLayer[] = [];
+
+  registerLayer(layer: ContextLayer): void {
+    this.layers.push(layer);
+    this.layers.sort((a, b) => a.priority - b.priority);
+  }
+
+  async compile(event: SecurityEvent, totalBudget: number): Promise<string> {
+    const sections: string[] = [];
+    let remainingBudget = totalBudget;
+
+    for (const layer of this.layers) {
+      if (remainingBudget <= 0) break;
+
+      const budget = Math.min(layer.maxTokens, remainingBudget);
+      const content = await layer.build(event);
+      const truncated = this.truncateToTokens(content, budget);
+
+      if (truncated.length > 0) {
+        sections.push(`### ${layer.name}\n${truncated}`);
+        remainingBudget -= this.estimateTokens(truncated);
+      }
+    }
+
+    return sections.join("\n\n");
+  }
+
+  private truncateToTokens(text: string, maxTokens: number): string {
+    // Trunca texto para caber no budget, preservando frases completas
+  }
+}
+```
+
+### Exemplo de Uso
+
+```typescript
+// No agent.ts, durante handleEvent():
+const context = await this.contextCompiler.compile(event, 4000);
+const prompt = `${SYSTEM_PROMPT}\n\n${context}\n\nAnalise o evento: ${event.description}`;
+const response = await this.llmClient.generate(prompt);
+```
+
+---
+
+## 9. Grafo de Conhecimento
 
 ```python
 class KnowledgeGraph:
@@ -494,7 +736,7 @@ class KnowledgeGraph:
 
 ---
 
-## 9. Ciclo de Vida de uma Pessoa no Sistema
+## 10. Ciclo de Vida de uma Pessoa no Sistema
 
 ```
 ┌──────────┐     N visits     ┌──────────────────┐    User names    ┌──────────┐
@@ -520,7 +762,7 @@ Decaimento de importância:
 
 ---
 
-## 10. Consultas Típicas do LLM à Memória
+## 11. Consultas Típicas do LLM à Memória
 
 O LLM pode "consultar" a memória através de funções (tool calling):
 
@@ -559,3 +801,207 @@ MEMORY_TOOLS = [
     },
 ]
 ```
+
+---
+
+## 12. Ciclo de Consolidação Contínua (Continuous Self-Learning Loop)
+
+> **Novo**: Issue [#1](https://github.com/ZanettiLG/SecurityAgent/issues/1) — Fase 4
+
+### Conceito
+
+O Ciclo de Consolidação Contínua é o mecanismo que transforma o Vigia de um
+sistema **reativo** (processa evento → responde) para um sistema **reflexivo**
+(observa → relaciona → aprende → pergunta → atualiza modelo mental).
+
+Em vez de tratar cada evento isoladamente, o agente periodicamente "para e pensa"
+sobre o que observou, consolidando conhecimento como um vigia humano faria.
+
+### Arquitetura do Ciclo
+
+```
+┌──────────────┐     ┌─────────────────┐     ┌──────────────────┐
+│ Novos Eventos │ ──▶ │ Context Compiler │ ──▶ │ LLM Consolidation │
+│ (buffer)      │     │ (monta prompt    │     │ ("O que aprendi   │
+│               │     │  com eventos     │     │  de novo?")       │
+│               │     │  recentes + KG)  │     │                   │
+└──────────────┘     └─────────────────┘     └────────┬──────────┘
+                                                      │
+                                                      ▼
+┌──────────────────────────────────────────────────────────────┐
+│ Ações de Consolidação                                         │
+│                                                               │
+│ ✅ Novo fato: "Carro ABC é associado à vizinha Fulana"        │
+│    → update KnowledgeGraph                                    │
+│                                                               │
+│ ✅ Padrão: "Carteiro agora vem às 11h em vez de 10h"          │
+│    → update RoutineLearner                                    │
+│                                                               │
+│ ✅ Hipótese atualizada: "Motorista ≠ Olinda" (confirmado)     │
+│    → update HypothesisEngine                                  │
+│                                                               │
+│ ❓ Dúvida: "Quem é a pessoa de boné azul?"                    │
+│    → criar Question para o usuário                            │
+│                                                               │
+│ 🔄 Sumarização: eventos antigos → memória compacta             │
+│    → salvar em long_term_memories                             │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### Gatilhos de Consolidação
+
+O ciclo é disparado por **três tipos de gatilhos**:
+
+| Gatilho                  | Condição                              | Exemplo                                           |
+| ------------------------ | ------------------------------------- | ------------------------------------------------- |
+| **Temporal**             | A cada N minutos                      | A cada 5 minutos, consolida eventos novos         |
+| **Quantitativo**         | Após N eventos não-consolidados       | 50 eventos novos → dispara consolidação           |
+| **Evento significativo** | Evento de alta severidade ou anomalia | Pessoa desconhecida às 3h → consolidação imediata |
+
+### Prompt de Consolidação
+
+```
+Você é o Vigia, um agente de segurança com inteligência ambiental contínua.
+Revise os eventos recentes e o conhecimento atual para aprender.
+
+## CONHECIMENTO ATUAL
+{scene_context}
+{knowledge_graph_summary}
+{active_hypotheses}
+
+## EVENTOS RECENTES (últimos {N} minutos)
+{recent_events}
+
+## PERGUNTAS PENDENTES
+{pending_questions}
+
+## TAREFA
+Analise os eventos recentes e:
+
+1. IDENTIFIQUE NOVOS FATOS:
+   - Alguma entidade nova foi observada? (pessoa, veículo)
+   - Alguma relação foi descoberta? (pessoa X associada a veículo Y)
+   - Algum padrão mudou? (carteiro agora vem em horário diferente)
+
+2. ATUALIZE HIPÓTESES:
+   - Alguma hipótese foi confirmada pelos novos eventos?
+   - Alguma hipótese foi refutada?
+   - Novas hipóteses devem ser criadas?
+
+3. IDENTIFIQUE DÚVIDAS:
+   - O que você gostaria de perguntar ao usuário?
+   - Há informação que poderia ser útil para entender melhor os eventos?
+
+4. SUMARIZE:
+   - Eventos antigos que podem ser comprimidos em uma memória compacta
+
+Responda em JSON estruturado.
+```
+
+### Output Esperado
+
+```json
+{
+  "newFacts": [
+    {
+      "type": "vehicle_person_association",
+      "description": "Carro prata XYZ-9999 parece estar associado à vizinha Fulana",
+      "confidence": 0.65,
+      "action": "update_knowledge_graph"
+    }
+  ],
+  "hypothesisUpdates": [
+    {
+      "hypothesisId": "hyp_abc123",
+      "newStatus": "confirmed",
+      "reason": "Motorista foi visto 5x com a mesma pessoa, compatível com H3"
+    }
+  ],
+  "questions": [
+    {
+      "text": "A vizinha Fulana tem algum parente que dirige um carro prata?",
+      "priority": "low",
+      "context": "Carro prata visto 3x esta semana em frente à casa azul"
+    }
+  ],
+  "summaries": [
+    {
+      "eventIds": ["evt_old_1", "evt_old_2"],
+      "compactMemory": "Carteiro visitou diariamente entre 10h-11h por 30 dias consecutivos"
+    }
+  ]
+}
+```
+
+### Implementação no Agent
+
+```typescript
+class ConsolidationLoop {
+  private interval: ReturnType<typeof setInterval> | null = null;
+  private unconsolidatedCount = 0;
+
+  constructor(
+    private agent: SecurityAgent,
+    private options: {
+      intervalMs: number; // 5 * 60 * 1000
+      eventThreshold: number; // 50
+    },
+  ) {}
+
+  start(): void {
+    this.interval = setInterval(() => {
+      this.consolidate();
+    }, this.options.intervalMs);
+
+    // Também dispara por contagem de eventos
+    this.agent.bus.on("event.*", () => {
+      this.unconsolidatedCount++;
+      if (this.unconsolidatedCount >= this.options.eventThreshold) {
+        this.consolidate();
+      }
+    });
+
+    // Dispara imediatamente em eventos críticos
+    this.agent.bus.on("event.*", (event: SecurityEvent) => {
+      if (event.severity >= Severity.HIGH) {
+        this.consolidate();
+      }
+    });
+  }
+
+  async consolidate(): Promise<void> {
+    const context = await this.agent.contextCompiler.compileForConsolidation();
+    const prompt = this.buildConsolidationPrompt(context);
+    const result = await this.agent.llmClient.generate(prompt);
+    const actions = JSON.parse(result);
+
+    // Executa ações de consolidação
+    for (const fact of actions.newFacts) {
+      await this.applyNewFact(fact);
+    }
+    for (const update of actions.hypothesisUpdates) {
+      await this.agent.hypothesisEngine.update(update);
+    }
+    for (const question of actions.questions) {
+      this.agent.queryManager.createQuestion(question);
+    }
+    for (const summary of actions.summaries) {
+      await this.agent.memory.storeCompactMemory(summary);
+    }
+
+    this.unconsolidatedCount = 0;
+    logger.info(
+      { facts: actions.newFacts.length, questions: actions.questions.length },
+      "Consolidation cycle complete",
+    );
+  }
+}
+```
+
+---
+
+## 13. Referência Cruzada com o GitHub Issue
+
+A implementação completa destas novas capacidades de memória está
+rastreada no **[Issue #1 — Memória Persistente Multi-Sessão e Compreensão
+Contextual Instintiva do Ambiente](https://github.com/ZanettiLG/SecurityAgent/issues/1)**.

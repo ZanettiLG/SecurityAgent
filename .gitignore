@@ -28,3 +28,4 @@ logs/
 # Config local
 config/secrets/
 *.secret
+.pocket_harness

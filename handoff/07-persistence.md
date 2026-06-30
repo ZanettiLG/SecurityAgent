@@ -1,18 +1,27 @@
-# 07 — Persistence Layer: SQLite + ChromaDB
+# 07 — Persistence Layer: SQLite + ChromaDB + Full Multi-Session
 
 ## Objetivo
 
-Substituir todos os stores in-memory por persistência real. Sem isso,
+Substituir **todos** os stores in-memory por persistência real. Sem isso,
 o sistema esquece tudo ao reiniciar — inaceitável para um Vigia.
+
+**Novo direcionamento** ([Issue #1](https://github.com/ZanettiLG/SecurityAgent/issues/1)):
+Persistência não só de eventos e pessoas, mas também do Knowledge Graph,
+rotinas aprendidas, histórico de conversas, hipóteses e contexto de cena.
 
 ## Arquivos a criar/modificar
 
 ```
 src/memory/
-├── system.ts              # MODIFICAR — adicionar initialize(), usar DBs reais
+├── system.ts              # MODIFICAR — usar todos os stores persistentes
 ├── sqlite-event-store.ts  # NOVO — EventStore com SQLite (better-sqlite3)
 ├── chroma-vector-store.ts # NOVO — VectorStore com ChromaDB
-└── person-store.ts        # NOVO — PersonRegistry com SQLite
+├── person-store.ts        # NOVO — PersonRegistry com SQLite
+├── kg-store.ts            # NOVO — KnowledgeGraph persistente (Issue #1)
+├── routine-store.ts       # NOVO — RoutineProfile persistente (Issue #1)
+├── hypothesis-store.ts    # NOVO — Hypothesis persistente (Issue #1)
+├── conversation-store.ts  # NOVO — ConversationHistory persistente (Issue #1)
+└── scene-context-store.ts # NOVO — SceneContext persistente (Issue #1)
 ```
 
 ## Tarefa 7.1: `src/memory/sqlite-event-store.ts`
@@ -189,11 +198,19 @@ export class ChromaVectorStore implements VectorStore {
     }
   }
 
-  async search(collection: string, queryVector: number[], topK = 5): Promise<VectorMatch[]> {
-    if (!this.online) return this.fallback.search(collection, queryVector, topK);
+  async search(
+    collection: string,
+    queryVector: number[],
+    topK = 5,
+  ): Promise<VectorMatch[]> {
+    if (!this.online)
+      return this.fallback.search(collection, queryVector, topK);
 
     const col = await this.getOrCreateCollection(collection);
-    const results = await col.query({ queryEmbeddings: [queryVector], nResults: topK });
+    const results = await col.query({
+      queryEmbeddings: [queryVector],
+      nResults: topK,
+    });
     // Mapeia resultado ChromaDB → VectorMatch[]
     return (results.ids[0] ?? []).map((id: string, i: number) => ({
       id,
@@ -227,7 +244,10 @@ export class MemorySystem {
     this.vectorStore = chromaVs;
     // chromaVs.initialize() é chamado em this.initialize()
 
-    this.anomalyDetector = new AnomalyDetector(this.eventStore, this.personRegistry);
+    this.anomalyDetector = new AnomalyDetector(
+      this.eventStore,
+      this.personRegistry,
+    );
   }
 
   async initialize(): Promise<void> {
@@ -242,7 +262,9 @@ export class MemorySystem {
     await this.eventStore.insert(event);
   }
 
-  async getContextForLlm(event: SecurityEvent): Promise<Record<string, unknown>> {
+  async getContextForLlm(
+    event: SecurityEvent,
+  ): Promise<Record<string, unknown>> {
     // Usa eventStore real
     const recent = await this.eventStore.getRecent(10);
     // ...
@@ -298,3 +320,243 @@ console.log('Events stored:', recent.length);
 - [ ] ChromaDB com fallback in-memory
 - [ ] Compila com `tsc --noEmit`
 - [ ] Teste manual: eventos persistem entre reinícios
+
+---
+
+## Tarefa 7.5: `src/memory/kg-store.ts` — Knowledge Graph Persistente (Issue #1)
+
+### Schema SQLite
+
+```sql
+CREATE TABLE IF NOT EXISTS kg_nodes (
+  id TEXT PRIMARY KEY,
+  type TEXT NOT NULL,           -- PERSON, VEHICLE, CAMERA, LOCATION, INCIDENT
+  label TEXT NOT NULL,
+  properties TEXT DEFAULT '{}', -- JSON
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS kg_edges (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  from_node TEXT NOT NULL,
+  to_node TEXT NOT NULL,
+  type TEXT NOT NULL,           -- VISITED_WITH, ASSOCIATED_WITH, SEEN_AT, OWNS
+  properties TEXT DEFAULT '{}', -- JSON
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (from_node) REFERENCES kg_nodes(id),
+  FOREIGN KEY (to_node) REFERENCES kg_nodes(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_kg_edges_from ON kg_edges(from_node);
+CREATE INDEX IF NOT EXISTS idx_kg_edges_to ON kg_edges(to_node);
+CREATE INDEX IF NOT EXISTS idx_kg_edges_type ON kg_edges(type);
+```
+
+### Implementação
+
+```typescript
+export class PersistentKnowledgeGraph extends KnowledgeGraph {
+  private db: Database.Database;
+
+  constructor(dbPath: string) {
+    super();
+    this.db = new Database(dbPath);
+  }
+
+  async load(): Promise<void> {
+    // Carrega todos os nodes e edges do SQLite para memória
+    const nodes = this.db.prepare("SELECT * FROM kg_nodes").all();
+    for (const row of nodes) {
+      this.addNode({
+        id: row.id,
+        type: row.type as NodeType,
+        label: row.label,
+        properties: JSON.parse(row.properties),
+      });
+    }
+
+    const edges = this.db.prepare("SELECT * FROM kg_edges").all();
+    for (const row of edges) {
+      this.edges.push({
+        from: row.from_node,
+        to: row.to_node,
+        type: row.type as EdgeType,
+        properties: JSON.parse(row.properties),
+        createdAt: new Date(row.created_at),
+      });
+    }
+  }
+
+  override addNode(node: GraphNode): void {
+    super.addNode(node);
+    this.db
+      .prepare(
+        `
+      INSERT OR REPLACE INTO kg_nodes (id, type, label, properties, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `,
+      )
+      .run(
+        node.id,
+        node.type,
+        node.label,
+        JSON.stringify(node.properties),
+        new Date().toISOString(),
+        new Date().toISOString(),
+      );
+  }
+
+  override addEdge(
+    from: string,
+    to: string,
+    type: EdgeType,
+    properties?: Record<string, unknown>,
+  ): void {
+    super.addEdge(from, to, type, properties);
+    this.db
+      .prepare(
+        `
+      INSERT INTO kg_edges (from_node, to_node, type, properties, created_at)
+      VALUES (?, ?, ?, ?, ?)
+    `,
+      )
+      .run(
+        from,
+        to,
+        type,
+        JSON.stringify(properties ?? {}),
+        new Date().toISOString(),
+      );
+  }
+}
+```
+
+---
+
+## Tarefa 7.6: `src/memory/routine-store.ts` — Routine Profiles Persistentes (Issue #1)
+
+### Schema SQLite
+
+```sql
+CREATE TABLE IF NOT EXISTS routine_profiles (
+  entity_id TEXT PRIMARY KEY,
+  entity_type TEXT NOT NULL,    -- camera, person, vehicle, location, universal, category
+  hourly_activity TEXT NOT NULL DEFAULT '[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]',
+  daily_activity TEXT NOT NULL DEFAULT '[0,0,0,0,0,0,0]',
+  typical_events TEXT DEFAULT '{}', -- JSON map
+  total_observations INTEGER DEFAULT 0,
+  days_of_data INTEGER DEFAULT 0,
+  last_updated TEXT
+);
+```
+
+### Integração no RoutineLearner
+
+- `initialize()`: carrega profiles do SQLite
+- `updateProfile()`: write-through para SQLite
+- `getProfile()`: cache em memória, fallback para SQLite
+
+---
+
+## Tarefa 7.7: `src/memory/conversation-store.ts` — Histórico de Conversas (Issue #1)
+
+### Schema SQLite
+
+```sql
+CREATE TABLE IF NOT EXISTS conversation_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  question_id TEXT NOT NULL,
+  text TEXT NOT NULL,
+  answer TEXT NOT NULL,
+  asked_at TEXT NOT NULL,
+  answered_at TEXT,
+  priority TEXT DEFAULT 'medium',
+  related_entities TEXT DEFAULT '[]',
+  related_event_id TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_conv_ts ON conversation_history(asked_at);
+```
+
+### Integração no QueryManager
+
+- `initialize()`: carrega últimas N conversas
+- `createQuestion()`: persiste a pergunta
+- `processAnswer()`: persiste a resposta
+- `getConversationSummary()`: lê do SQLite em vez de array em memória
+
+---
+
+## Tarefa 7.8: `src/memory/hypothesis-store.ts` — Hipóteses Persistentes (Issue #1)
+
+### Schema SQLite
+
+```sql
+CREATE TABLE IF NOT EXISTS hypotheses (
+  hypothesis_id TEXT PRIMARY KEY,
+  description TEXT NOT NULL,
+  probability REAL DEFAULT 0.5,
+  status TEXT NOT NULL DEFAULT 'draft',  -- draft, testing, confirmed, rejected, user_confirmed, user_rejected, inconclusive
+  related_entities TEXT DEFAULT '[]',
+  related_events TEXT DEFAULT '[]',
+  evidence_for TEXT DEFAULT '[]',
+  evidence_against TEXT DEFAULT '[]',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+```
+
+### Integração no HypothesisEngine
+
+- `initialize()`: carrega hipóteses ativas (status = testing/draft)
+- Cada mutation persiste no SQLite
+- Hipóteses `confirmed` ou `rejected` com >30 dias podem ser arquivadas
+
+---
+
+## Tarefa 7.9: `src/memory/scene-context-store.ts` — Contexto de Cena Persistente (Issue #1)
+
+### Schema SQLite
+
+```sql
+CREATE TABLE IF NOT EXISTS scene_contexts (
+  camera_id TEXT PRIMARY KEY,
+  description TEXT NOT NULL DEFAULT '',
+  spatial_layout TEXT DEFAULT '',
+  known_persons TEXT DEFAULT '[]',
+  known_vehicles TEXT DEFAULT '[]',
+  zones TEXT DEFAULT '[]',
+  acquired_facts TEXT DEFAULT '[]',
+  confidence REAL DEFAULT 0.5,
+  status TEXT DEFAULT 'uninitialized',  -- uninitialized, bootstrapped, active
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+```
+
+### Integração
+
+- `CameraConnector` ganha referência ao `SceneContext`
+- No `agent.setup()`, carrega todos os SceneContexts
+- No prompt do LLM, o SceneContext da câmera do evento é sempre injetado
+- `SceneAnalyzer` (do semantic-scene-index) atualiza o SceneContext
+
+---
+
+## Verificação Final (Issue #1)
+
+```bash
+# Iniciar agente
+npm run dev
+
+# Verificar persistência pós-restart
+# 1. Deixa o agente rodar por alguns minutos
+# 2. Reinicia o agente
+# 3. Verifica se:
+#    - Knowledge Graph manteve nodes e edges
+#    - RoutineLearner manteve perfis
+#    - Histórico de conversas foi preservado
+#    - Hipóteses ativas foram mantidas
+#    - SceneContexts foram carregados
+```

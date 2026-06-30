@@ -1,5 +1,8 @@
 # Unified Scene Semantic Index — Design Proposal
 
+> **Atualizado**: 2026-06-30 — Integração com Scene Context Bootstrapping
+> ([Issue #1](https://github.com/ZanettiLG/SecurityAgent/issues/1) Fase 2)
+
 ## Problema atual
 
 O pipeline atual é puramente reativo: pixel-diff → evento de movimento. Não há **entendimento** do que está na cena — só "algo mudou". O PersonRegistry tem `faceEmbeddingCount` mas nunca gera embeddings de fato. O ChromaDB existe mas está vazio.
@@ -18,33 +21,36 @@ interface SceneObservation {
   snapshotPath: string;
 
   description: SceneDescription;
-  textEmbedding?: number[];   // embed(narration) → vai pro ChromaDB
+  textEmbedding?: number[]; // embed(narration) → vai pro ChromaDB
 }
 
 interface SceneDescription {
-  narration: string;          // "Homem de camisa azul com mochila escura..."
+  narration: string; // "Homem de camisa azul com mochila escura..."
 
   persons: {
     localId: string;
-    personId?: string;         // match contra PersonRegistry
+    personId?: string; // match contra PersonRegistry
     appearance: {
-      estimatedAge?: string;   // "30-40 anos"
-      clothing: string;        // "calça jeans, camiseta branca"
-      accessories: string[];   // ["mochila preta", "boné"]
+      estimatedAge?: string; // "30-40 anos"
+      clothing: string; // "calça jeans, camiseta branca"
+      accessories: string[]; // ["mochila preta", "boné"]
       height?: string;
     };
-    movement?: string;         // "caminhando", "parado", "olhando"
+    movement?: string; // "caminhando", "parado", "olhando"
     appearsKnown: boolean;
   }[];
 
   vehicles: {
-    type: string; color: string; plate?: string; parkedMinutes?: number;
+    type: string;
+    color: string;
+    plate?: string;
+    parkedMinutes?: number;
   }[];
 
   objects: { type: string; relevance: "normal" | "suspicious" | "threat" }[];
-  actions: string[];           // ["abrindo portão", "olhando para a janela"]
-  intentions: string[];        // ["possível entrega", "observando residência"]
-  anomalyFlags: string[];      // ["pessoa circulando repetidamente"]
+  actions: string[]; // ["abrindo portão", "olhando para a janela"]
+  intentions: string[]; // ["possível entrega", "observando residência"]
+  anomalyFlags: string[]; // ["pessoa circulando repetidamente"]
 }
 ```
 
@@ -76,9 +82,9 @@ Frame JPEG
 
 ```typescript
 interface SemanticQuery {
-  text?: string;           // "homem com mochila preta"
-  imageBuffer?: Buffer;    // frame de referência (CLIP future)
-  personId?: string;       // busca por pessoa conhecida
+  text?: string; // "homem com mochila preta"
+  imageBuffer?: Buffer; // frame de referência (CLIP future)
+  personId?: string; // busca por pessoa conhecida
   dateRange?: [Date, Date];
   cameraId?: string;
   topK?: number;
@@ -88,7 +94,7 @@ interface SemanticResult {
   observation: SceneObservation;
   score: number;
   matchedBy: ("text" | "face" | "metadata")[];
-  highlights: string[];    // trechos relevantes da narration
+  highlights: string[]; // trechos relevantes da narration
 }
 ```
 
@@ -103,12 +109,12 @@ As duas se fundem com score ponderado.
 Em vez de embeddings visuais (CLIP precisaria de infra Python), usamos
 **LLM Vision → texto → text embedding**. Isso dá:
 
-| O que o usuário quer buscar       | Como resolve                              |
-|-----------------------------------|-------------------------------------------|
-| "pessoa de camisa vermelha"       | text search → narration                   |
-| "aquele cara de ontem de tarde"   | date filter + person re-id por aparência  |
-| "quem estava na câmera 1 às 10h?" | camera filter + time filter + top results |
-| "veículo suspeito parado"         | text search → anomalyFlags + vehicles     |
+| O que o usuário quer buscar       | Como resolve                                |
+| --------------------------------- | ------------------------------------------- |
+| "pessoa de camisa vermelha"       | text search → narration                     |
+| "aquele cara de ontem de tarde"   | date filter + person re-id por aparência    |
+| "quem estava na câmera 1 às 10h?" | camera filter + time filter + top results   |
+| "veículo suspeito parado"         | text search → anomalyFlags + vehicles       |
 | reconhecimento facial             | face embedding (face-api.js) → person_faces |
 
 CLIP pode entrar depois como coluna adicional no índice sem mudar a interface de busca.
@@ -170,11 +176,13 @@ Seja objetivo e preciso. Use português.
 ## Integração no chat
 
 Quando o usuário perguntar "quem estava aqui ontem?", o agente vai:
+
 1. Extrair filtros (data, câmera) da pergunta
 2. Chamar `SemanticSearch.search({ text: "pessoa", dateRange: [...] })`
 3. Retornar as observações rankeadas com snapshots + descrições
 
 Exemplos de queries suportadas:
+
 - "mostra quem passou pela câmera externa hoje de manhã"
 - "aquele homem de boné que apareceu semana passada"
 - "quando foi a última vez que vi um veículo parado?"
@@ -185,21 +193,25 @@ Exemplos de queries suportadas:
 ## Fases de implementação
 
 ### Fase 1 — SceneAnalyzer + types (base)
+
 - Novos tipos em `core/types.ts`
 - `SceneAnalyzer` com LLM vision (GPT-4o-mini ou Ollama/LLaVA)
 - Integração no agente: dispara após motion acima do threshold
 
 ### Fase 2 — SceneIndex + SemanticSearch
+
 - `SceneIndex` persiste observações no SQLite + embeds no ChromaDB
 - `SemanticSearch` implementa a query unificada
 - Endpoint REST `/api/search` no servidor
 
 ### Fase 3 — Face recognition
+
 - face-api.js para detecção e embedding de rostos
 - Re-identificação de pessoas ao longo do tempo
 - Link entre SceneObservation e PersonRegistry
 
 ### Fase 4 — CLIP (opcional)
+
 - Microserviço Python com `sentence-transformers` + CLIP
 - Busca por imagem de referência
 - Adiciona coluna `imageEmbedding` no índice sem mudar interface
@@ -210,8 +222,9 @@ Exemplos de queries suportadas:
 
 ### Motivação
 
-Saber *o que* há na cena não é suficiente — precisamos saber *onde* e *a que distância*.
+Saber _o que_ há na cena não é suficiente — precisamos saber _onde_ e _a que distância_.
 Com posicionamento espacial conseguimos inferir:
+
 - "pessoa a 2m do portão" vs "pessoa a 15m na calçada"
 - "veículo parado em frente à garagem" vs "veículo passando na rua"
 - "pessoa se aproximando" vs "pessoa se afastando"
@@ -229,17 +242,19 @@ Frame JPEG
 ```
 
 **Modelos candidatos:**
-| Modelo | Inferência | Precisão | Hardware |
-|--------|-----------|----------|----------|
-| Depth Anything v2 Small | ~50ms/frame | Alta | CPU ok |
-| MiDaS v3.1 Small | ~30ms/frame | Boa | CPU ok |
-| ZoeDepth | ~80ms/frame | Muito alta | GPU ideal |
+
+| Modelo                  | Inferência  | Precisão   | Hardware  |
+| ----------------------- | ----------- | ---------- | --------- |
+| Depth Anything v2 Small | ~50ms/frame | Alta       | CPU ok    |
+| MiDaS v3.1 Small        | ~30ms/frame | Boa        | CPU ok    |
+| ZoeDepth                | ~80ms/frame | Muito alta | GPU ideal |
 
 **Output no SceneDescription:**
+
 ```typescript
 interface SpatialPosition {
-  relativeX: number;        // 0-1 (posição horizontal na cena)
-  relativeY: number;        // 0-1 (posição vertical)
+  relativeX: number; // 0-1 (posição horizontal na cena)
+  relativeY: number; // 0-1 (posição vertical)
   estimatedDistanceM: number; // metros estimados
   zone: "immediate" | "near" | "mid" | "far";
   // immediate: <2m, near: 2-5m, mid: 5-15m, far: >15m
@@ -256,21 +271,23 @@ interface PersonObservation {
 ```
 
 **Narração com profundidade:**
+
 > "Homem de camisa azul a ~3m do portão (zona imediata), se aproximando lentamente"
 
 vs. hoje:
+
 > "Homem de camisa azul"
 
 ### OCR (Leitura de texto na cena)
 
 Casos de uso críticos:
 
-| O que ler | Para quê | Modelo |
-|-----------|----------|--------|
-| Placas de veículos | Identificar veículos recorrentes | PaddleOCR / OpenALPR |
-| Números de casa | Confirmar localização | Tesseract |
-| Uniformes / crachás | Identificar prestadores de serviço | PaddleOCR |
-| Letreiros de veículos | "Correios", "iFood", "SEDEX" | PaddleOCR |
+| O que ler             | Para quê                           | Modelo               |
+| --------------------- | ---------------------------------- | -------------------- |
+| Placas de veículos    | Identificar veículos recorrentes   | PaddleOCR / OpenALPR |
+| Números de casa       | Confirmar localização              | Tesseract            |
+| Uniformes / crachás   | Identificar prestadores de serviço | PaddleOCR            |
+| Letreiros de veículos | "Correios", "iFood", "SEDEX"       | PaddleOCR            |
 
 ```typescript
 interface OcrResult {
@@ -283,10 +300,10 @@ interface OcrResult {
 // VehicleObservation ganha:
 interface VehicleObservation {
   // ... existing fields
-  plate?: string;           // via OCR
+  plate?: string; // via OCR
   plateConfidence?: number;
-  brandingText?: string;    // "Correios", "Rappi", "iFood"
-  isDelivery?: boolean;     // inferido de brandingText
+  brandingText?: string; // "Correios", "Rappi", "iFood"
+  isDelivery?: boolean; // inferido de brandingText
 }
 ```
 
@@ -340,6 +357,7 @@ e recebe `{ depthMap, ocrResults }` de volta. Fallback: campos `null` se offline
 ### Motivação
 
 Com as câmeras controláveis (PTZ), o sistema pode:
+
 - **Agente**: seguir automaticamente uma pessoa detectada
 - **Usuário**: controlar a câmera pelo dashboard com joystick virtual
 
@@ -348,15 +366,15 @@ A câmera Intelbras iM7 externa provavelmente suporta PTZ.
 
 ### Capabilities ONVIF relevantes
 
-| Capability | O que faz | Uso no Vigia |
-|-----------|-----------|--------------|
-| **PTZ Continuous Move** | Mover em direção (pan/tilt/zoom) | Joystick do usuário |
-| **PTZ Absolute Move** | Ir para posição exata | Auto-track de pessoa |
-| **PTZ Presets** | Posições salvas | "Portão", "Garagem", "Rua" |
-| **PTZ Home** | Retornar à posição padrão | Reset após tracking |
-| **Goto Preset** | Pular para preset | Agente muda de ângulo |
-| **Image Settings** | Brilho, contraste, IR | Ajuste automático (noite) |
-| **PTZ Stop** | Parar movimento | Ao soltar joystick |
+| Capability              | O que faz                        | Uso no Vigia               |
+| ----------------------- | -------------------------------- | -------------------------- |
+| **PTZ Continuous Move** | Mover em direção (pan/tilt/zoom) | Joystick do usuário        |
+| **PTZ Absolute Move**   | Ir para posição exata            | Auto-track de pessoa       |
+| **PTZ Presets**         | Posições salvas                  | "Portão", "Garagem", "Rua" |
+| **PTZ Home**            | Retornar à posição padrão        | Reset após tracking        |
+| **Goto Preset**         | Pular para preset                | Agente muda de ângulo      |
+| **Image Settings**      | Brilho, contraste, IR            | Ajuste automático (noite)  |
+| **PTZ Stop**            | Parar movimento                  | Ao soltar joystick         |
 
 ### Novo módulo: `CameraController`
 
@@ -364,9 +382,9 @@ A câmera Intelbras iM7 externa provavelmente suporta PTZ.
 // src/perception/camera-controller.ts
 
 interface PtzVector {
-  pan: number;    // -1.0 a 1.0
-  tilt: number;   // -1.0 a 1.0
-  zoom: number;   // 0.0 a 1.0
+  pan: number; // -1.0 a 1.0
+  tilt: number; // -1.0 a 1.0
+  zoom: number; // 0.0 a 1.0
 }
 
 interface CameraPreset {
@@ -382,9 +400,13 @@ class CameraController {
   async gotoHome(cameraId: string): Promise<void>;
   async listPresets(cameraId: string): Promise<CameraPreset[]>;
   async savePreset(cameraId: string, name: string): Promise<string>; // retorna token
-  
+
   // Auto-track: move câmera para centralizar bounding box
-  async trackTarget(cameraId: string, boundingBox: BoundingBox, frameSize: { w: number; h: number }): Promise<void>;
+  async trackTarget(
+    cameraId: string,
+    boundingBox: BoundingBox,
+    frameSize: { w: number; h: number },
+  ): Promise<void>;
 }
 ```
 
@@ -402,6 +424,7 @@ PersonObservation { boundingBox, spatialPosition }
 ```
 
 Loop de tracking com PID simples:
+
 ```
 offset_x = (bbox.centerX / frame.width) - 0.5  // -0.5 a +0.5
 pan_speed = offset_x * gain                      // proporcional
@@ -498,12 +521,71 @@ Frame JPEG
 
 ### Stack de serviços
 
-| Serviço | Tecnologia | Porta |
-|---------|-----------|-------|
-| Backend (agent) | Node.js / tsx | 5174 |
-| Dashboard | Vite / React | 5173 |
-| ChromaDB | Docker | 8000 |
-| Perception Service | Python / FastAPI | 8001 |
+| Serviço            | Tecnologia       | Porta |
+| ------------------ | ---------------- | ----- |
+| Backend (agent)    | Node.js / tsx    | 5174  |
+| Dashboard          | Vite / React     | 5173  |
+| ChromaDB           | Docker           | 8000  |
+| Perception Service | Python / FastAPI | 8001  |
 
 O Perception Service é o único novo processo — depth + OCR rodam lá.
 Tudo mais permanece em Node.js.
+
+---
+
+## Integração com Scene Context Bootstrapping
+
+> **Issue [#1](https://github.com/ZanettiLG/SecurityAgent/issues/1) — Fase 2**
+
+O `SceneAnalyzer` tem um segundo papel além de analisar eventos: **bootstrapping
+do contexto de cena**. Quando uma câmera é adicionada pela primeira vez, o
+SceneAnalyzer gera uma descrição inicial do ambiente que é armazenada no
+`SceneContextStore` e usada como "conhecimento instintivo" pelo agente.
+
+### Fluxo de Bootstrapping
+
+```
+1. Câmera nova detectada → SceneContextStore.status = "uninitialized"
+
+2. Primeiro frame → SceneAnalyzer com prompt de bootstrapping:
+   ┌─────────────────────────────────────────────────────────┐
+   │ "Descreva esta cena de câmera de segurança de forma     │
+   │  abrangente. Identifique:                               │
+   │  - Zonas visíveis (portão, garagem, rua, calçada...)    │
+   │  - Objetos permanentes (árvores, postes, muros...)      │
+   │  - Veículos estacionados (se houver)                    │
+   │  - Características do ambiente (residencial, comercial) │
+   │  - Pontos de entrada/saída                              │
+   │                                                         │
+   │  Use português. Seja descritivo."                       │
+   └─────────────────────────────────────────────────────────┘
+
+3. SceneContextStore.save(cameraId, {
+     description: "Câmera na área externa da residência...",
+     spatialLayout: "...",
+     zones: [...],
+     status: "bootstrapped"
+   })
+
+4. Usuário valida/edita (via dashboard):
+   - Confirma descrição
+   - Nomeia residentes e veículos
+   - Marca zonas de interesse
+
+5. SceneContextStore.status → "active"
+   → Agora o agente "sabe" o que esta câmera vê
+```
+
+### Diferença: SceneObservation vs SceneContext
+
+| Aspecto             | SceneObservation               | SceneContext                              |
+| ------------------- | ------------------------------ | ----------------------------------------- |
+| **O que é**         | Descrição de um evento/momento | Descrição do ambiente (estático)          |
+| **Quando atualiza** | A cada evento significativo    | Raramente (boot + descobertas)            |
+| **Persistência**    | SQLite + ChromaDB              | SQLite (scene_contexts)                   |
+| **Uso no LLM**      | Contexto de evento específico  | Contexto base (sempre presente)           |
+| **Conteúdo**        | "Homem de azul caminhando"     | "Esta câmera vê: portão, rua, 5 casas..." |
+
+O `SceneContext` é o **pano de fundo permanente**. O `SceneObservation` é o
+**evento pontual**. O Context Compiler (Issue #1 Fase 3) monta ambos no
+prompt do LLM: SceneContext como base, SceneObservation como foco.
