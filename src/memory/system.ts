@@ -13,6 +13,7 @@ import { SqliteEventStore } from "./sqlite-event-store.js";
 import { SqlitePersonRegistry } from "./person-store.js";
 import { ChromaVectorStore } from "./chroma-vector-store.js";
 import { KnowledgeGraph } from "./knowledge-graph.js";
+import { SceneContextStore } from "./scene-context-store.js";
 
 // ── Vector Store ─────────────────────────────────────────────────
 
@@ -23,16 +24,32 @@ export interface VectorMatch {
 }
 
 export interface VectorStore {
-  search(collection: string, queryVector: number[], topK?: number): Promise<VectorMatch[]>;
-  insert(collection: string, id: string, vector: number[], metadata?: Record<string, unknown>): Promise<void>;
+  search(
+    collection: string,
+    queryVector: number[],
+    topK?: number,
+  ): Promise<VectorMatch[]>;
+  insert(
+    collection: string,
+    id: string,
+    vector: number[],
+    metadata?: Record<string, unknown>,
+  ): Promise<void>;
   delete(collection: string, id: string): Promise<void>;
   count(collection: string): Promise<number>;
 }
 
 export class InMemoryVectorStore implements VectorStore {
-  private collections: Map<string, Map<string, { vector: number[]; metadata: Record<string, unknown> }>> = new Map();
+  private collections: Map<
+    string,
+    Map<string, { vector: number[]; metadata: Record<string, unknown> }>
+  > = new Map();
 
-  async search(collection: string, queryVector: number[], topK = 5): Promise<VectorMatch[]> {
+  async search(
+    collection: string,
+    queryVector: number[],
+    topK = 5,
+  ): Promise<VectorMatch[]> {
     const col = this.collections.get(collection);
     if (!col) return [];
 
@@ -46,7 +63,12 @@ export class InMemoryVectorStore implements VectorStore {
     return results.slice(0, topK);
   }
 
-  async insert(collection: string, id: string, vector: number[], metadata: Record<string, unknown> = {}): Promise<void> {
+  async insert(
+    collection: string,
+    id: string,
+    vector: number[],
+    metadata: Record<string, unknown> = {},
+  ): Promise<void> {
     if (!this.collections.has(collection)) {
       this.collections.set(collection, new Map());
     }
@@ -89,7 +111,10 @@ export class AnomalyDetector {
       for (const pid of event.personsInvolved) {
         const person = await this.personRegistry.get(pid);
         if (person) {
-          if (person.category === PersonCategory.UNKNOWN && person.totalVisits === 1) {
+          if (
+            person.category === PersonCategory.UNKNOWN &&
+            person.totalVisits === 1
+          ) {
             scores.push(0.7); // Pessoa nunca vista antes
           } else if (person.category === PersonCategory.THREAT) {
             scores.push(1.0);
@@ -117,6 +142,7 @@ export class MemorySystem {
   personRegistry: SqlitePersonRegistry;
   anomalyDetector: AnomalyDetector;
   knowledgeGraph: KnowledgeGraph;
+  sceneContextStore: SceneContextStore;
 
   constructor(config?: { dataDir?: string; chromaHost?: string }) {
     const dataDir = config?.dataDir ?? "./data";
@@ -127,8 +153,14 @@ export class MemorySystem {
     this.vectorStore = chromaVs;
 
     this.knowledgeGraph = new KnowledgeGraph();
+    this.sceneContextStore = new SceneContextStore(
+      `${dataDir}/scene-contexts.db`,
+    );
 
-    this.anomalyDetector = new AnomalyDetector(this.eventStore, this.personRegistry);
+    this.anomalyDetector = new AnomalyDetector(
+      this.eventStore,
+      this.personRegistry,
+    );
   }
 
   async initialize(): Promise<void> {
@@ -142,7 +174,9 @@ export class MemorySystem {
     await this.eventStore.insert(event);
   }
 
-  async getContextForLlm(event: SecurityEvent): Promise<Record<string, unknown>> {
+  async getContextForLlm(
+    event: SecurityEvent,
+  ): Promise<Record<string, unknown>> {
     const recent = await this.eventStore.getRecent(10);
     const persons = await Promise.all(
       event.personsInvolved.map(async (pid) => ({

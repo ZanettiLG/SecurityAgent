@@ -53,6 +53,8 @@ import {
 } from "../perception/camera-connector.js";
 import { KnowledgeGraph } from "../memory/knowledge-graph.js";
 import { SocialMediaInvestigator } from "../processing/social-investigator.js";
+import { createDefaultSceneContext } from "../memory/scene-context-store.js";
+import type { SceneContext } from "../core/types.js";
 
 // ── Agent ────────────────────────────────────────────────────────
 
@@ -84,6 +86,7 @@ export class SecurityAgent {
   behaviorMatcher: BehavioralPatternMatcher | null = null;
   knowledgeGraph: KnowledgeGraph | null = null;
   retrospectiveAnalyzer: RetrospectiveAnalyzer | null = null;
+  sceneContexts: Map<string, SceneContext> = new Map();
 
   // Timing
   private tickInterval: ReturnType<typeof setInterval> | null = null;
@@ -167,6 +170,17 @@ export class SecurityAgent {
     // Register default behavioral signatures
     for (const sig of createDefaultSignatures()) {
       this.behaviorMatcher.registerSignature(sig);
+    }
+
+    // Load SceneContexts for each camera from SQLite
+    for (const cam of this.config.cameras.filter((c) => c.enabled)) {
+      let ctx = await this.memory.sceneContextStore.get(cam.id);
+      if (!ctx) {
+        ctx = createDefaultSceneContext(cam.id, cam.name);
+        await this.memory.sceneContextStore.save(ctx);
+        logger.info({ cameraId: cam.id }, "Default SceneContext created");
+      }
+      this.sceneContexts.set(cam.id, ctx);
     }
 
     logger.info("All subsystems initialized");

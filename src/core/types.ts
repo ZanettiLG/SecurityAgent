@@ -13,7 +13,8 @@ export const PersonCategory = {
   FREQUENT_UNKNOWN: "frequent_unknown",
   THREAT: "threat",
 } as const;
-export type PersonCategory = (typeof PersonCategory)[keyof typeof PersonCategory];
+export type PersonCategory =
+  (typeof PersonCategory)[keyof typeof PersonCategory];
 
 export const EventType = {
   // Pessoas
@@ -122,16 +123,20 @@ export class WorldState {
 
         switch (op) {
           case ">":
-            if (!(typeof current === "number" && current > numVal)) return false;
+            if (!(typeof current === "number" && current > numVal))
+              return false;
             break;
           case "<":
-            if (!(typeof current === "number" && current < numVal)) return false;
+            if (!(typeof current === "number" && current < numVal))
+              return false;
             break;
           case ">=":
-            if (!(typeof current === "number" && current >= numVal)) return false;
+            if (!(typeof current === "number" && current >= numVal))
+              return false;
             break;
           case "<=":
-            if (!(typeof current === "number" && current <= numVal)) return false;
+            if (!(typeof current === "number" && current <= numVal))
+              return false;
             break;
           case "==":
             if (current !== val) return false;
@@ -152,7 +157,8 @@ export class WorldState {
     for (const [key, value] of Object.entries(effects)) {
       if (Array.isArray(value)) {
         const [op, val] = value;
-        const current = typeof newFacts[key] === "number" ? (newFacts[key] as number) : 0;
+        const current =
+          typeof newFacts[key] === "number" ? (newFacts[key] as number) : 0;
         const numVal = typeof val === "number" ? val : 0;
 
         if (op === "+") newFacts[key] = current + numVal;
@@ -195,11 +201,54 @@ export class WorldState {
   }
 }
 
+// ── Scene Context (Issue #1 — Memória Persistente Multi-Sessão) ──
+
+export interface SceneContext {
+  cameraId: string;
+  label: string;
+  description: string;
+  location: "INTERNAL" | "EXTERNAL" | "PERIMETER";
+  environment: {
+    timeOfDay: string[];
+    weather: string[];
+    lighting: "BRIGHT" | "DIM" | "DARK";
+  };
+  knownResidents: Array<{
+    personId: string;
+    name: string;
+    relationship: "RESIDENT" | "FAMILY" | "EMPLOYEE" | "FREQUENT_VISITOR";
+  }>;
+  knownVehicles: Array<{
+    vehicleId: string;
+    plate: string | null;
+    description: string;
+    ownerPersonId: string | null;
+  }>;
+  zones: Array<{
+    name: string;
+    description: string;
+    importance: "NORMAL" | "SENSITIVE" | "CRITICAL";
+  }>;
+  routines: string[];
+  lastUpdated: Date;
+  version: number;
+}
+
+export interface SceneContextUpdate {
+  description?: string;
+  location?: SceneContext["location"];
+  knownResidents?: SceneContext["knownResidents"];
+  knownVehicles?: SceneContext["knownVehicles"];
+  routines?: string[];
+}
+
 // ── Helper: create event factory ─────────────────────────────────
 
 let _eventCounter = 0;
 
-export function createEvent(partial: Partial<SecurityEvent> & { eventType: EventType }): SecurityEvent {
+export function createEvent(
+  partial: Partial<SecurityEvent> & { eventType: EventType },
+): SecurityEvent {
   _eventCounter++;
   return {
     eventId: `evt_${Date.now()}_${_eventCounter}`,
