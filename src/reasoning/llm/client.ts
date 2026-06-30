@@ -1,14 +1,15 @@
 /**
- * LLM Client — Integração com OpenAI, Anthropic Claude e Ollama (local).
+ * LLM Client — OpenAI-compatible API (vLLM, OpenAI, OpenRouter, etc.).
  *
  * Fornece avaliação de eventos de segurança, geração de hipóteses
- * e sumários diários usando LLMs. Suporta fallback determinístico
- * quando nenhuma API key está configurada.
+ * e sumários diários usando LLMs. Usa exclusivamente o SDK OpenAI
+ * com baseURL configurável — compatível com qualquer servidor
+ * que exponha a API /v1/chat/completions.
  */
 
 import OpenAI from "openai";
 import type { SecurityEvent } from "../../core/types.js";
-import { EventType, Severity, createEvent } from "../../core/types.js";
+import { Severity } from "../../core/types.js";
 import { logger } from "../../core/logger.js";
 
 // ── Types ────────────────────────────────────────────────────────
@@ -23,10 +24,9 @@ export interface LlmAssessment {
 }
 
 export interface LlmClientConfig {
-  provider: "openai" | "anthropic" | "ollama";
-  model: string;
   apiKey?: string;
-  baseUrl?: string;
+  baseUrl: string;
+  model: string;
   maxTokens?: number;
   temperature?: number;
 }
@@ -66,10 +66,19 @@ export class LlmClient {
 
   constructor(config: LlmClientConfig) {
     this.config = {
-      maxTokens: 1000,
+      maxTokens: 4096,
       temperature: 0.3,
       ...config,
     };
+  }
+
+  /** Retorna true se o modelo é do tipo thinking/reasoning. */
+  private isThinkingModel(): boolean {
+    return (
+      this.config.model.includes("thinking") ||
+      this.config.model.includes("reasoning") ||
+      this.config.model.includes("deepseek-r1")
+    );
   }
 
   // ── Public API ───────────────────────────────────────────────
@@ -116,7 +125,9 @@ export class LlmClient {
   async generateHypotheses(
     event: SecurityEvent,
     context: Record<string, unknown>,
-  ): Promise<Array<{ title: string; description: string; probability: number }>> {
+  ): Promise<
+    Array<{ title: string; description: string; probability: number }>
+  > {
     const userPrompt = [
       "Gere hipóteses sobre o seguinte evento de segurança:",
       "",
@@ -155,7 +166,10 @@ export class LlmClient {
         probability: Number(h.probability ?? 0),
       }));
     } catch {
-      logger.warn({ raw: response.slice(0, 200) }, "Failed to parse hypotheses response");
+      logger.warn(
+        { raw: response.slice(0, 200) },
+        "Failed to parse hypotheses response",
+      );
       return [];
     }
   }
@@ -200,47 +214,18 @@ export class LlmClient {
   // ── Private: LLM generation ──────────────────────────────────
 
   /**
-   * Gera uma resposta do LLM usando o provedor configurado.
-   * Suporta OpenAI, Anthropic Claude e Ollama.
-   * Retorna fallback determinístico quando nenhuma API key está configurada.
+   * Gera resposta do LLM usando SDK OpenAI com baseURL configurável.
+   * Compatível com vLLM, OpenAI, OpenRouter — qualquer servidor
+   * que exponha /v1/chat/completions.
    */
-  private async generate(systemPrompt: string, userPrompt: string): Promise<string> {
-    // ── Fallback: sem API key (exceto Ollama que é local) ──
-    if (!this.config.apiKey && this.config.provider !== "ollama") {
-      logger.warn("No API key configured, using fallback responses");
-      return JSON.stringify({
-        assessment: "LLM não configurado — usando fallback",
-        threat_level: 0,
-        suggested_actions: [],
-        explanation: "Configure uma API key para avaliações reais.",
-        anomaly_score: 0,
-      });
-    }
-
-    switch (this.config.provider) {
-      case "openai":
-        return this.generateOpenAI(systemPrompt, userPrompt);
-      case "anthropic":
-        return this.generateAnthropic(systemPrompt, userPrompt);
-      case "ollama":
-        return this.generateOllama(systemPrompt, userPrompt);
-      default:
-        logger.warn({ provider: this.config.provider }, "Unknown provider, using fallback");
-        return JSON.stringify({
-          assessment: "Provedor desconhecido",
-          threat_level: 0,
-          suggested_actions: [],
-          explanation: `Provider "${this.config.provider}" não suportado.`,
-          anomaly_score: 0,
-        });
-    }
-  }
-
-  /**
-   * Chamada à API da OpenAI com JSON mode forçado.
-   */
-  private async generateOpenAI(systemPrompt: string, userPrompt: string): Promise<string> {
-    const client = new OpenAI({ apiKey: this.config.apiKey });
+  private async generate(
+    systemPrompt: string,
+    userPrompt: string,
+  ): Promise<string> {
+    const client = new OpenAI({
+      apiKey: this.config.apiKey ?? "not-needed",
+      baseURL: this.config.baseUrl,
+    });
 
     const response = await client.chat.completions.create({
       model: this.config.model,
@@ -250,97 +235,12 @@ export class LlmClient {
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
-      response_format: { type: "json_object" },
+      ...(this.isThinkingModel()
+        ? { extra_body: { enable_thinking: true } }
+        : {}),
     });
 
     return response.choices[0]?.message?.content ?? "";
-  }
-
-  /**
-   * Chamada à API Anthropic (Claude).
-   * O SDK é importado dinamicamente pois é uma dependência opcional.
-   */
-  private async generateAnthropic(systemPrompt: string, userPrompt: string): Promise<string> {
-    let Anthropic: new (config: { apiKey: string }) => {
-      messages: {
-        create: (params: {
-          model: string;
-          max_tokens: number;
-          temperature?: number;
-          system: string;
-          messages: Array<{ role: "user"; content: string }>;
-        }) => Promise<{
-          content: Array<{ type: string; text?: string }>;
-        }>;
-      };
-    };
-
-    try {
-      const mod = await import("@anthropic-ai/sdk");
-      Anthropic = mod.default ?? mod.Anthropic;
-    } catch {
-      logger.error("@anthropic-ai/sdk is not installed. Install it as an optional dependency.");
-      return JSON.stringify({
-        assessment: "SDK Anthropic não instalado",
-        threat_level: 0,
-        suggested_actions: [],
-        explanation: "Instale @anthropic-ai/sdk para usar o Claude.",
-        anomaly_score: 0,
-      });
-    }
-
-    const client = new Anthropic({ apiKey: this.config.apiKey! });
-
-    const response = await client.messages.create({
-      model: this.config.model,
-      max_tokens: this.config.maxTokens ?? 1000,
-      temperature: this.config.temperature,
-      system: systemPrompt,
-      messages: [{ role: "user", content: userPrompt }],
-    });
-
-    const text =
-      response.content[0]?.type === "text" ? (response.content[0].text ?? "") : "";
-
-    return text;
-  }
-
-  /**
-   * Chamada à API Ollama (local) via fetch.
-   */
-  private async generateOllama(systemPrompt: string, userPrompt: string): Promise<string> {
-    const baseUrl = this.config.baseUrl ?? "http://localhost:11434";
-
-    const response = await fetch(`${baseUrl}/api/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: this.config.model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        stream: false,
-        options: { temperature: this.config.temperature },
-      }),
-    });
-
-    if (!response.ok) {
-      logger.error(
-        { status: response.status, statusText: response.statusText },
-        "Ollama API request failed",
-      );
-      return JSON.stringify({
-        assessment: "Erro na comunicação com Ollama",
-        threat_level: 0,
-        suggested_actions: [],
-        explanation: `Ollama retornou status ${response.status}: ${response.statusText}`,
-        anomaly_score: 0,
-      });
-    }
-
-    const data = (await response.json()) as { message?: { content?: string } };
-    return data.message?.content ?? "";
   }
 
   // ── Public: Simple text generation ──────────────────────────

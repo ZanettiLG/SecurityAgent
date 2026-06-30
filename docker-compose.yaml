@@ -1,8 +1,8 @@
-version: "3.9"
-
 services:
   # ── SecurityAgent Core ──
   security-agent:
+    profiles:
+      - production
     build:
       context: .
       dockerfile: Dockerfile
@@ -17,7 +17,7 @@ services:
       - ./config:/app/config:ro
       - ./data:/app/data
       - ./recordings:/app/recordings
-    network_mode: "host"  # Para acessar câmeras RTSP na rede local
+    network_mode: "host" # Para acessar câmeras RTSP na rede local
     # devices:
     #   - /dev/video0:/dev/video0  # USB camera
     deploy:
@@ -63,19 +63,33 @@ services:
     ports:
       - "5433:5432"
 
-  # ── Ollama (LLM Local — opcional) ──
-  # ollama:
-  #   image: ollama/ollama:latest
-  #   container_name: security-ollama
-  #   restart: unless-stopped
-  #   volumes:
-  #     - ./data/ollama:/root/.ollama
-  #   ports:
-  #     - "11435:11434"
-  #   deploy:
-  #     resources:
-  #       reservations:
-  #         devices:
-  #           - driver: nvidia
-  #             count: 1
-  #             capabilities: [gpu]
+  # ── vLLM (LLM Server — OpenAI-compatible API) ──
+  vllm:
+    image: vllm/vllm-openai:latest
+    container_name: vllm-lfm-thinking
+    restart: unless-stopped
+    command:
+      - "--model"
+      - "${LLM_MODEL:-minicpm-v4.6}"
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "11434"
+      - "--max-model-len"
+      - "32768"
+      - "--gpu-memory-utilization"
+      - "0.90"
+    ports:
+      - "11434:11434"
+    volumes:
+      - ./data/vllm-models:/root/.cache/huggingface
+    environment:
+      - HF_HOME=/root/.cache/huggingface
+      - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN:-}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

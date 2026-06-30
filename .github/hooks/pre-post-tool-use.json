@@ -1,0 +1,23 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "type": "command",
+        "command": "node .github/scripts/trajectory-collector.js",
+        "timeout": 5
+      },
+      {
+        "type": "command",
+        "command": "node .github/scripts/auto-lint.js",
+        "timeout": 20
+      }
+    ],
+    "PreToolUse": [
+      {
+        "type": "command",
+        "command": "node .github/scripts/validate-tool-call.js",
+        "timeout": 10
+      }
+    ]
+  }
+}

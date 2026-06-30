@@ -11,14 +11,14 @@ ambiental continua**.
 A diferença nao esta nas tecnologias individuais (deteccao facial, tracking de
 veiculos, LLM), mas na **postura cognitiva** do sistema:
 
-| Seguranca Tradicional | Inteligencia Ambiental |
-|---|---|
-| "Ha uma ameaca?" | "O que esta acontecendo?" |
+| Seguranca Tradicional         | Inteligencia Ambiental                        |
+| ----------------------------- | --------------------------------------------- |
+| "Ha uma ameaca?"              | "O que esta acontecendo?"                     |
 | Classifica: perigoso / seguro | Classifica: tipico / atipico / curioso / novo |
-| Alerta o usuario | **Dialoga** com o usuario |
-| Esquece o evento | **Acumula** conhecimento |
-| Regras fixas | **Hipoteses** que evoluem |
-| Foco no objeto | Foco nas **relacoes** |
+| Alerta o usuario              | **Dialoga** com o usuario                     |
+| Esquece o evento              | **Acumula** conhecimento                      |
+| Regras fixas                  | **Hipoteses** que evoluem                     |
+| Foco no objeto                | Foco nas **relacoes**                         |
 
 ---
 
@@ -97,6 +97,7 @@ NOVA EVIDENCIA: 11 visitas em 38 dias, sempre noturno
 
 Isso é **raciocinio abdutivo** (inferencia para a melhor explicacao), onde o
 sistema:
+
 1. Gera hipoteses compativeis com os fatos
 2. Atribui probabilidades Bayesianas
 3. Busca ativamente evidencias para discrimina-las
@@ -135,6 +136,7 @@ prestadores de servico) e que:
 - **Comportamentos tem causas sociais** (visita frequente → relacao proxima)
 
 Isso permite raciocinios como:
+
 - "Frequencia de visitas > qualquer categoria normal → provavel relacao proxima"
 - "Distancia social = 1, fator fofoca = 1.5 → 97.4% de propagacao em 3 dias"
 - "Motorista diferente + pessoa conhecida no banco → provavel relacao pessoal"
@@ -177,6 +179,66 @@ Nao basta enviar notificacoes. O sistema precisa:
   - Manter contexto de conversa entre sessoes
 ```
 
+### D. Contexto de Cena Persistente (Scene Context Bootstrapping)
+
+> **Novo**: Issue [#1](https://github.com/ZanettiLG/SecurityAgent/issues/1) — Fase 2
+
+```
+Nao basta processar pixels. O sistema precisa:
+  - Ter um modelo mental inicial do que cada camera ve
+  - Saber descrever seu ambiente: "sou um vigia, esta camera ve o portao,
+    a rua, as casas dos vizinhos, o carro dos residentes na garagem"
+  - Manter esse conhecimento entre sessoes (persistente)
+  - Evoluir o modelo com novas descobertas: "agora sei que a casa azul
+    e da vizinha Fulana"
+  - Usar esse contexto como base para TODA analise de eventos
+
+O SceneContext e a "memoria instintiva" do Vigia — o que ele "sabe"
+sobre seu ambiente sem precisar pensar. E o equivalente a um segurança
+humano que conhece o local onde trabalha.
+```
+
+### E. Motor de Relacionamento de Contextos (Context Linking Engine)
+
+> **Novo**: Issue [#1](https://github.com/ZanettiLG/SecurityAgent/issues/1) — Fase 3
+
+```
+Nao basta armazenar fatos isolados. O sistema precisa:
+  - Cruzar automaticamente fatos de diferentes fontes e momentos
+  - "Carro X parado" + "Fulana saiu de casa" + "Carro X e similar ao
+    carro Y visto ontem" → link automatico no Knowledge Graph
+  - Enriquecer cada evento com TODO o contexto relevante do KG
+  - Detectar quando uma nova observacao contradiz ou confirma
+    conhecimento previo
+  - Fundir entidades duplicadas: "Carro placa ABC visto hoje" +
+    "Carro placa ABC visto ontem" → mesma entidade
+
+O Context Linking transforma observacoes pontuais em compreensao.
+E a diferenca entre "vi um carro" e "sei que este carro pertence
+a vizinha Fulana, que o motorista e diferente dela, e que ele
+costuma vir a noite".
+```
+
+### F. Ciclo de Auto-Aprendizado Continuo (Consolidation Loop)
+
+> **Novo**: Issue [#1](https://github.com/ZanettiLG/SecurityAgent/issues/1) — Fase 4
+
+```
+Nao basta reagir a eventos. O sistema precisa:
+  - Periodicamente "parar e pensar" sobre o que observou
+  - Consolidar conhecimento: "o que eu aprendi de novo?"
+  - Atualizar o Knowledge Graph com novos fatos e relacoes
+  - Ajustar rotinas aprendidas: "o carteiro agora vem as 11h"
+  - Gerar perguntas quando tem duvidas genuinas
+  - Sumarizar eventos antigos em memorias compactas
+  - Executar este ciclo de forma autonoma, sem depender do usuario
+
+O Consolidation Loop e o que transforma o Vigia de um sistema
+reativo ("processa evento → responde") para um sistema verdadeiramente
+reflexivo ("observa → relaciona → aprende → pergunta → atualiza
+modelo mental"). E o ciclo que fecha o loop da inteligencia ambiental.
+```
+
 ---
 
 ## Metrica de Sucesso
@@ -188,7 +250,8 @@ O Vigia nao é medido por "quantas ameacas detectou", mas por:
 3. **Relevancia das perguntas**: O usuario considera as perguntas uteis ou intrusivas?
 4. **Antecipacao**: O sistema preve eventos antes que o usuario os perceba?
 5. **Autonomia com respeito**: O sistema age sozinho quando pode, pergunta quando deve?
-    → Quando sai: registra duração, atualiza baseline
+   → Quando sai: registra duração, atualiza baseline
+
 ```
 
 ### Exemplo da História
@@ -230,6 +293,7 @@ Cada entidade (câmera, pessoa, localização) tem um `RoutineProfile`:
 
 ### Algoritmo
 ```
+
 1. Calcula frequência da pessoa (visitas/semana)
 2. Compara com médias de categorias:
    - parentes: ~1.5/semana
@@ -237,6 +301,7 @@ Cada entidade (câmera, pessoa, localização) tem um `RoutineProfile`:
    - vizinhos: ~3/semana
    - visitantes: ~0.5/semana
 3. Se frequência >> referência → "Probabilidade elevada de relacionamento próximo"
+
 ```
 
 ### Exemplo da História
@@ -255,12 +320,14 @@ Cada entidade (câmera, pessoa, localização) tem um `RoutineProfile`:
 
 ### Estados de uma Hipótese
 ```
+
 DRAFT → TESTING → CONFIRMED (dados corroboram)
-                 → REJECTED  (dados contradizem)
-                 → USER_CONFIRMED (usuário confirma)
-                 → USER_REJECTED  (usuário rejeita)
-                 → INCONCLUSIVE   (dados insuficientes)
-```
+→ REJECTED (dados contradizem)
+→ USER_CONFIRMED (usuário confirma)
+→ USER_REJECTED (usuário rejeita)
+→ INCONCLUSIVE (dados insuficientes)
+
+````
 
 ### Exemplo da História
 > Sistema: "Dona Olinda possui algum filho?"
@@ -292,19 +359,21 @@ VIGIA_QUESTION_TEMPLATES = {
     "authorize_investigation": "Deseja autorizar investigação em fontes públicas?",
     "view_evidence": "Deseja visualizar as evidências públicas?",
 }
-```
+````
 
 ---
 
 ## 6. Investigação em Fontes Públicas
 
 ### ⚠️ Princípios Éticos
+
 1. **Autorização explícita**: Nunca investiga sem o usuário dizer "sim"
 2. **Apenas fontes públicas**: Nada de hacking, logins, ou fontes privadas
 3. **Transparência**: O usuário sempre sabe o que foi consultado
 4. **Respeito à privacidade**: Dados sensíveis nunca saem do dispositivo
 
 ### Exemplo da História
+
 > "Manuel autorizou uma investigação adicional utilizando fontes públicas.
 > O sistema encontrou perfis em redes sociais compatíveis.
 > Idade estimada: 34 anos. Diferença: 31 anos."
@@ -328,6 +397,7 @@ Probabilidade = base_prob × interaction_freq × gossip_factor
 ```
 
 ### Exemplo da História
+
 > "Recomendo manter atenção à janela da cozinha.
 > Existe alta probabilidade de a dona Marlene descobrir
 > essa informação antes do final da semana."
@@ -335,7 +405,7 @@ Probabilidade = base_prob × interaction_freq × gossip_factor
 > Manuel: "Qual a probabilidade?"
 > Sistema: "97,4%."
 >
-> *Três dias depois:* "Previsão social confirmada."
+> _Três dias depois:_ "Previsão social confirmada."
 
 ---
 
@@ -343,13 +413,14 @@ Probabilidade = base_prob × interaction_freq × gossip_factor
 
 O Vigia não é um sistema frio. Ele adapta o tom:
 
-| Tom | Uso | Exemplo |
-|-----|-----|---------|
-| **Informativo** | Padrão, eventos normais | "Manuel, detectei um veículo..." |
-| **Casual** | Insights sociais | "A dona Olinda é danada..." |
-| **Humorístico** | Eventos inusitados | "Incidente classificado como: Extremamente interessante" |
+| Tom             | Uso                     | Exemplo                                                  |
+| --------------- | ----------------------- | -------------------------------------------------------- |
+| **Informativo** | Padrão, eventos normais | "Manuel, detectei um veículo..."                         |
+| **Casual**      | Insights sociais        | "A dona Olinda é danada..."                              |
+| **Humorístico** | Eventos inusitados      | "Incidente classificado como: Extremamente interessante" |
 
 ### Categorias de Evento não-tradicionais
+
 ```python
 # Além de INFO, LOW, MEDIUM, HIGH, CRITICAL:
 "Extremamente interessante"  # Fofoca da vizinhança
@@ -361,6 +432,7 @@ O Vigia não é um sistema frio. Ele adapta o tom:
 ## 9. Integração com o Resto do Sistema
 
 ### Fluxo Completo
+
 ```
 Câmera → Detecção facial + veicular
     → Vision Pipeline gera evento
@@ -373,14 +445,15 @@ Câmera → Detecção facial + veicular
 ```
 
 ### Novos Eventos
-| EventType | Gatilho |
-|-----------|---------|
-| `VEHICLE_DETECTED` | Veículo estacionado > baseline |
-| `PATTERN_DEVIATION` | Evento em horário/dia atípico |
-| `SOCIAL_INSIGHT` | Descoberta social relevante |
-| `HYPOTHESIS_GENERATED` | Nova hipótese formulada |
-| `USER_QUERY` | Pergunta enviada ao usuário |
-| `USER_ANSWER` | Resposta recebida |
+
+| EventType              | Gatilho                           |
+| ---------------------- | --------------------------------- |
+| `VEHICLE_DETECTED`     | Veículo estacionado > baseline    |
+| `PATTERN_DEVIATION`    | Evento em horário/dia atípico     |
+| `SOCIAL_INSIGHT`       | Descoberta social relevante       |
+| `HYPOTHESIS_GENERATED` | Nova hipótese formulada           |
+| `USER_QUERY`           | Pergunta enviada ao usuário       |
+| `USER_ANSWER`          | Resposta recebida                 |
 | `INVESTIGATION_RESULT` | Resultado de investigação pública |
-| `PREDICTION_MADE` | Predição social registrada |
-| `PREDICTION_VERIFIED` | Predição confirmada/refutada |
+| `PREDICTION_MADE`      | Predição social registrada        |
+| `PREDICTION_VERIFIED`  | Predição confirmada/refutada      |

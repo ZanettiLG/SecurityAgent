@@ -24,71 +24,99 @@ const CameraConfig = z.object({
   enabled: z.boolean().default(true),
   username: z.string().optional(),
   password: z.string().optional(),
-  zones: z.array(z.object({
-    name: z.string(),
-    coords: z.array(z.number()),
-  })).default([]),
-  processing: z.object({
-    faceDetection: z.boolean().default(true),
-    objectDetection: z.boolean().default(true),
-    motionDetection: z.boolean().default(true),
-    frameSkip: z.number().default(3),
-  }).default({}),
+  transport: z.enum(["tcp", "udp"]).default("tcp"),
+  zones: z
+    .array(
+      z.object({
+        name: z.string(),
+        coords: z.array(z.number()),
+      }),
+    )
+    .default([]),
+  processing: z
+    .object({
+      faceDetection: z.boolean().default(true),
+      objectDetection: z.boolean().default(true),
+      motionDetection: z.boolean().default(true),
+      frameSkip: z.number().default(3),
+    })
+    .default({}),
+  /** ONVIF HTTP port (defaults to 80, or inferred from source URL if http/https) */
+  onvifPort: z.number().int().min(1).max(65535).optional(),
+  /** Disable WS-Security for cameras that only support Digest auth */
+  onvifUseWSSecurity: z.boolean().default(false).optional(),
 });
 
 const VigiaConfig = z.object({
   enabled: z.boolean().default(true),
-  vehicles: z.object({
-    enabled: z.boolean().default(true),
-    parkingBaselineSeconds: z.number().default(300),
-    askUserThresholdSeconds: z.number().default(600),
-    learnDuration: z.boolean().default(true),
-  }).default({}),
-  routines: z.object({
-    enabled: z.boolean().default(true),
-    learningRate: z.number().default(0.05),
-    atypicalThreshold: z.number().default(0.15),
-    minObservations: z.number().default(10),
-  }).default({}),
-  hypotheses: z.object({
-    enabled: z.boolean().default(true),
-    autoGenerateThreshold: z.number().default(0.4),
-    askUserThreshold: z.number().default(0.5),
-    maxActiveHypotheses: z.number().default(10),
-  }).default({}),
-  queries: z.object({
-    enabled: z.boolean().default(true),
-    maxPendingQuestions: z.number().default(5),
-    questionCooldownSeconds: z.number().default(300),
-    tone: z.enum(["informative", "casual", "humoristico"]).default("informative"),
-  }).default({}),
+  vehicles: z
+    .object({
+      enabled: z.boolean().default(true),
+      parkingBaselineSeconds: z.number().default(300),
+      askUserThresholdSeconds: z.number().default(600),
+      learnDuration: z.boolean().default(true),
+    })
+    .default({}),
+  routines: z
+    .object({
+      enabled: z.boolean().default(true),
+      learningRate: z.number().default(0.05),
+      atypicalThreshold: z.number().default(0.15),
+      minObservations: z.number().default(10),
+    })
+    .default({}),
+  hypotheses: z
+    .object({
+      enabled: z.boolean().default(true),
+      autoGenerateThreshold: z.number().default(0.4),
+      askUserThreshold: z.number().default(0.5),
+      maxActiveHypotheses: z.number().default(10),
+    })
+    .default({}),
+  queries: z
+    .object({
+      enabled: z.boolean().default(true),
+      maxPendingQuestions: z.number().default(5),
+      questionCooldownSeconds: z.number().default(300),
+      tone: z
+        .enum(["informative", "casual", "humoristico"])
+        .default("informative"),
+    })
+    .default({}),
 });
 
 const LlmConfig = z.object({
-  provider: z.enum(["openai", "anthropic", "ollama"]).default("openai"),
-  model: z.string().default("gpt-4o-mini"),
+  baseUrl: z.string().default("http://localhost:11434/v1"),
   apiKey: z.string().optional(),
-  baseUrl: z.string().nullable().default(null),
-  maxTokens: z.number().default(1000),
+  model: z.string().default("minicpm-v4.6"),
+  maxTokens: z.number().default(4096),
   temperature: z.number().default(0.3),
 });
 
 const AppConfigSchema = z.object({
-  system: z.object({
-    mode: z.enum(["home", "away", "night", "vacation", "business_hours"]).default("home"),
-    logLevel: z.string().default("INFO"),
-    dataDir: z.string().default("./data"),
-  }).default({}),
+  system: z
+    .object({
+      mode: z
+        .enum(["home", "away", "night", "vacation", "business_hours"])
+        .default("home"),
+      logLevel: z.string().default("INFO"),
+      dataDir: z.string().default("./data"),
+    })
+    .default({}),
   cameras: z.array(CameraConfig).default([]),
   llm: LlmConfig.default({}),
   vigia: VigiaConfig.default({}),
-  goap: z.object({
-    enabled: z.boolean().default(true),
-    tickIntervalMs: z.number().default(2000),
-  }).default({}),
-  rules: z.object({
-    enabled: z.boolean().default(true),
-  }).default({}),
+  goap: z
+    .object({
+      enabled: z.boolean().default(true),
+      tickIntervalMs: z.number().default(2000),
+    })
+    .default({}),
+  rules: z
+    .object({
+      enabled: z.boolean().default(true),
+    })
+    .default({}),
 });
 
 export type AppConfig = z.infer<typeof AppConfigSchema>;
@@ -103,7 +131,8 @@ let _config: AppConfig | null = null;
 export function loadConfig(path?: string): AppConfig {
   if (_config) return _config;
 
-  const configPath = path || join(__dirname, "..", "..", "config", "settings.yaml");
+  const configPath =
+    path || join(__dirname, "..", "..", "config", "settings.yaml");
   let raw = readFileSync(configPath, "utf-8");
 
   // Substitui ${VAR_NAME} por process.env.VAR_NAME

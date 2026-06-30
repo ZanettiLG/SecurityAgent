@@ -1,0 +1,71 @@
+name: 🗂️ Planning Card
+description: Agent handoff card — task decomposition (filled by planner agent)
+title: "plan: "
+labels: ["agent:planning", "status:in-progress"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        > 📋 **Phase 2/3 — Planning**. Filled by the `planner` agent.
+        > This card is the ONLY context the `coder` receives. Tasks must be atomic.
+
+  - type: input
+    id: research_ref
+    attributes:
+      label: Research Card Reference
+      placeholder: "#123"
+
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective
+      description: One sentence — what are we building?
+    validations:
+      required: true
+
+  - type: textarea
+    id: architecture
+    attributes:
+      label: Architecture Notes
+      description: Layers touched, DI, patterns, design decisions
+
+  - type: textarea
+    id: tasks
+    attributes:
+      label: Tasks (ordered, atomic)
+      value: |
+        ### Task 1: [Name] (low/medium/high)
+        - **Create**: `path/to/file.ts` — [purpose]
+        - **Edit**: `path/to/existing.ts` — [changes]
+        - **Deps**: None
+        - **Conventions**: [specific AGENTS.md rules]
+        - **Test**: [strategy]
+
+        ### Task 2: [Name] (...)
+        ...
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      placeholder: "- [ ] Given X, when Y, then Z"
+
+  - type: checkboxes
+    id: dod
+    attributes:
+      label: DoD → Implementation
+      options:
+        - label: All tasks completed
+        - label: Tests passing (330 backend + 2 frontend baseline)
+        - label: Lint 0 + typecheck 0
+        - label: Code review passed
+        - label: PR created
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        ## 🤖 Handoff → Coder
+        **Receives:** Objective, Architecture Notes, Tasks, Acceptance Criteria
+        **Does NOT receive:** Research card, planning rationale, conversation
+        **Job:** Implement tasks in order. One commit per task. Test each.

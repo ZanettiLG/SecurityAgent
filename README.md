@@ -39,6 +39,7 @@ O SecurityAgent é um agente autônomo que:
 ## Funcionalidades Principais
 
 ### 🔍 Reconhecimento Inteligente
+
 - Detecção facial em tempo real (YOLOv8-face, RetinaFace)
 - Reconhecimento facial com embeddings (ArcFace, FaceNet)
 - Reconhecimento de voz independente de texto (ECAPA-TDNN)
@@ -46,6 +47,7 @@ O SecurityAgent é um agente autônomo que:
 - Detecção de objetos relevantes (pacotes, veículos, armas)
 
 ### 🧠 Memória e Aprendizado
+
 - Memória vetorial para rostos e vozes (ChromaDB / Qdrant)
 - Memória episódica de eventos com timestamps
 - Grafo de conhecimento de relacionamentos (pessoa A + pessoa B)
@@ -53,6 +55,7 @@ O SecurityAgent é um agente autônomo que:
 - Esquecimento progressivo de eventos antigos (importância decrescente)
 
 ### 🎯 Tomada de Decisão (GOAP + LLM)
+
 - **GOAP**: planejamento goal-oriented para cenários de segurança
   - Ex: Goal "garantir perímetro seguro" → Actions: verificar câmeras, trancar portas, etc.
 - **Motor de Regras**: para ameaças imediatas e determinísticas
@@ -61,6 +64,7 @@ O SecurityAgent é um agente autônomo que:
   - Sumarização diária: "Hoje: 3 entregadores, 2 visitas, 1 evento incomum"
 
 ### ⚡ Ações Automatizadas
+
 - Notificações push (app, Telegram, WhatsApp)
 - Integração com Home Assistant / MQTT / Z-Wave / Zigbee
 - Acionamento de alarmes sonoros e visuais
@@ -68,7 +72,9 @@ O SecurityAgent é um agente autônomo que:
 - Gravação e upload de clipes para nuvem
 
 ### 🏘️ Inteligência de Vizinhança (O Vigia)
+
 Sistema de observação social inspirado na história "Manuel e o Vigia":
+
 - **Reconhecimento de veículos** com associação a pessoas
 - **Aprendizado de rotinas** (carteiro 10h, gás terça, vizinha sábado)
 - **Baselines estatísticos** ("a maioria dos carros fica <5min")
@@ -81,19 +87,17 @@ Sistema de observação social inspirado na história "Manuel e o Vigia":
 
 ## Stack Tecnológica
 
-| Camada | Tecnologias |
-|--------|-------------|
-| Linguagem Principal | Python 3.11+ |
-| Visão Computacional | OpenCV, YOLOv8, InsightFace, Ultralytics |
-| Áudio | PyAudio, SpeechBrain, Librosa, Whisper |
-| Banco Vetorial | ChromaDB / Qdrant |
-| Banco Relacional | PostgreSQL (eventos, configurações) |
-| Grafo | Neo4j ou NetworkX |
-| LLM | OpenAI GPT-4o / Claude / LLM Local (Ollama) |
-| Mensageria | Redis Pub/Sub, MQTT |
-| Stream Processing | Apache Kafka (escala empresarial) |
-| Infraestrutura | Docker, Docker Compose, NVIDIA CUDA |
-| Frontend (futuro) | React / Next.js |
+| Camada              | Tecnologias                                                                                                                                             |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Linguagem Principal | Python 3.11+                                                                                                                                            |
+| Visão Computacional | OpenCV, YOLOv8, InsightFace, Ultralytics                                                                                                                |
+| Áudio               | PyAudio, SpeechBrain, Librosa, Whisper                                                                                                                  |
+| Banco Vetorial      | ChromaDB / Qdrant                                                                                                                                       |
+| Banco Relacional    | PostgreSQL (eventos, configurações)                                                                                                                     |
+| LLM                 | vLLM (OpenAI-compatible API). Também compatível com OpenAI, OpenRouter — qualquer servidor `/v1/chat/completions`. Modelo configurável via `LLM_MODEL`. |
+| Mensageria          | Redis Pub/Sub                                                                                                                                           |
+| Infraestrutura      | Docker, Docker Compose, NVIDIA CUDA                                                                                                                     |
+| Frontend (futuro)   | React / Next.js                                                                                                                                         |
 
 ## Estrutura do Projeto
 

@@ -1,10 +1,12 @@
 /**
- * Vision Pipeline — Processes camera frames and generates security events.
+ * Vision Pipeline — Real motion detection via pixel differencing.
  *
- * Applies frame skipping, simulated motion detection (30% chance),
- * and publishes `MOTION_DETECTED` events to the EventBus.
+ * Uses sharp to decode JPEG frames and compare consecutive frames.
+ * If the percentage of changed pixels exceeds a threshold, a
+ * MOTION_DETECTED event is generated and published to the EventBus.
  */
 
+import sharp from "sharp";
 import type { EventBus } from "../core/bus.js";
 import { logger } from "../core/logger.js";
 import { EventType, Severity, createEvent } from "../core/types.js";
@@ -17,6 +19,19 @@ import type { CameraFrame } from "../perception/camera-connector.js";
 export class VisionPipeline {
   private frameCounts = new Map<string, number>();
   private readonly frameSkip = 3;
+
+  /** Stores the previous frame's raw pixel buffer per camera for diffing */
+  private previousFrames = new Map<string, Buffer>();
+
+  /** Minimum percentage of changed pixels to trigger motion (default 1%) */
+  private readonly motionThreshold = 0.01;
+
+  /** Downsample frames to this width for faster processing */
+  private readonly compareWidth = 320;
+
+  /** Track diagnostics */
+  private diagCount = 0;
+  private diagLastLog = 0;
 
   constructor(
     private bus: EventBus,
@@ -32,37 +47,145 @@ export class VisionPipeline {
     const count = (this.frameCounts.get(frame.cameraId) ?? 0) + 1;
     this.frameCounts.set(frame.cameraId, count);
 
+    if (count === 1 || count % 60 === 0) {
+      logger.info(
+        { cameraId: frame.cameraId, count, size: frame.data.length },
+        "Frame received",
+      );
+    }
+
     if (count % this.frameSkip !== 0) {
       return null;
     }
 
-    // ── Simulated motion detection: 30% chance ────────────────
-    const motionDetected = Math.random() < 0.3;
-
-    if (!motionDetected) {
+    // Guard: skip frames with empty or trivially small data
+    if (!frame.data || frame.data.length < 100) {
+      logger.warn(
+        { cameraId: frame.cameraId, size: frame.data?.length ?? 0 },
+        "Skipping empty/undersized frame",
+      );
       return null;
     }
 
-    // ── Create motion event ───────────────────────────────────
-    const event = createEvent({
-      eventType: EventType.MOTION_DETECTED,
-      cameraId: frame.cameraId,
-      severity: Severity.INFO,
-      description: `Movimento detectado na câmera ${frame.cameraId}`,
-      payload: {
-        frameTimestamp: frame.timestamp.toISOString(),
-        confidence: 0.8,
-      },
-    });
+    try {
+      // Decode JPEG with retry — ffmpeg may be mid-write
+      let raw: {
+        data: Buffer;
+        info: { width: number; height: number; channels: number };
+      } | null = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          raw = await sharp(frame.data)
+            .resize(
+              this.compareWidth,
+              Math.round(this.compareWidth * (frame.height / frame.width)),
+            )
+            .raw()
+            .toBuffer({ resolveWithObject: true });
+          break;
+        } catch (e: any) {
+          if (
+            !e.message?.includes("empty") &&
+            !e.message?.includes("premature") &&
+            !e.message?.includes("corrupt")
+          ) {
+            throw e; // Unknown error — let it bubble up
+          }
+          if (attempt === 2) {
+            logger.warn(
+              {
+                cameraId: frame.cameraId,
+                err: e.message,
+                attempts: attempt + 1,
+              },
+              "Frame decode failed after retries, skipping",
+            );
+            return null; // Graceful skip instead of crashing the camera loop
+          }
+          await new Promise((r) => setTimeout(r, 100)); // Espera ffmpeg terminar de escrever
+        }
+      }
+      if (!raw) return null;
 
-    logger.debug(
-      { eventId: event.eventId, cameraId: frame.cameraId },
-      "Motion detected event created",
-    );
+      const currentPixels = raw.data;
+      const prevPixels = this.previousFrames.get(frame.cameraId);
 
-    // ── Publish to event bus ──────────────────────────────────
-    this.bus.publish("vision.event", event);
+      // Store for next comparison
+      this.previousFrames.set(frame.cameraId, currentPixels);
 
-    return event;
+      // No previous frame yet — can't compare
+      if (!prevPixels || prevPixels.length !== currentPixels.length) {
+        return null;
+      }
+
+      // Pixel-by-pixel difference
+      const changedPixels = this.countChangedPixels(currentPixels, prevPixels);
+      const changeRatio = changedPixels / currentPixels.length;
+
+      // Diagnóstico a cada ~30 frames processados
+      this.diagCount++;
+      if (this.diagCount - this.diagLastLog >= 30) {
+        this.diagLastLog = this.diagCount;
+        logger.info(
+          {
+            cameraId: frame.cameraId,
+            changeRatio: (changeRatio * 100).toFixed(2) + "%",
+            changedPixels,
+          },
+          "Vision diag",
+        );
+      }
+
+      if (changeRatio < this.motionThreshold) {
+        return null;
+      }
+
+      // ── Motion detected! ──
+      const confidence = Math.min(1.0, changeRatio * 20); // 2% → 0.4, 5% → 1.0
+
+      const event = createEvent({
+        eventType: EventType.MOTION_DETECTED,
+        cameraId: frame.cameraId,
+        severity: Severity.INFO,
+        description: `Movimento detectado (${(changeRatio * 100).toFixed(1)}% dos pixels)`,
+        payload: {
+          frameTimestamp: frame.timestamp.toISOString(),
+          confidence,
+          changeRatio: Math.round(changeRatio * 10000) / 10000,
+        },
+      });
+
+      logger.debug(
+        { eventId: event.eventId, cameraId: frame.cameraId, changeRatio },
+        "Real motion detected",
+      );
+
+      // NOTE: bus.publish is done by the agent loop, not here — avoids duplicates
+      return event;
+    } catch (err) {
+      logger.warn({ err, cameraId: frame.cameraId }, "Vision processing error");
+      return null;
+    }
+  }
+
+  /**
+   * Count how many pixels differ between two raw RGBA buffers.
+   * Skips alpha channel for speed.
+   */
+  private countChangedPixels(current: Buffer, previous: Buffer): number {
+    let changed = 0;
+    const len = Math.min(current.length, previous.length);
+    // Compare RGB channels only (every 4th byte is alpha, skip it)
+    for (let i = 0; i < len; i += 4) {
+      // Tolerance: ignore 1-bit differences (camera noise)
+      const dr = Math.abs(current[i]! - previous[i]!);
+      const dg = Math.abs(current[i + 1]! - previous[i + 1]!);
+      const db = Math.abs(current[i + 2]! - previous[i + 2]!);
+      // Each channel must differ by >= 5 (out of 255) to count (was 10)
+      if (dr > 5 || dg > 5 || db > 5) {
+        changed++;
+      }
+    }
+    return changed;
   }
 }

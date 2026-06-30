@@ -1,0 +1,11 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "node .github/scripts/harness-state.js",
+        "timeout": 10
+      }
+    ]
+  }
+}

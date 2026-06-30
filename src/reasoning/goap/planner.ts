@@ -5,7 +5,11 @@
  */
 
 import { logger } from "../../core/logger.js";
-import { WorldState, type FactValue, type ConditionValue } from "../../core/types.js";
+import {
+  WorldState,
+  type FactValue,
+  type ConditionValue,
+} from "../../core/types.js";
 
 // ── Action ───────────────────────────────────────────────────────
 
@@ -66,7 +70,6 @@ export class GoapPlanner {
 
     // A* using array as priority queue
     const openSet: { f: number; node: PlanNode }[] = [];
-    let counter = 0;
 
     const startNode: PlanNode = { state: currentState, actions: [], cost: 0 };
     const h = currentState.distanceTo(goal.targetState);
@@ -98,7 +101,8 @@ export class GoapPlanner {
 
       for (const action of this.applicableActions(current.state)) {
         const newState = current.state.applyEffects(action.effects);
-        const tentativeG = (gScore.get(current.state.hash()) ?? 0) + action.cost;
+        const tentativeG =
+          (gScore.get(current.state.hash()) ?? 0) + action.cost;
         const stateHash = newState.hash();
 
         if (tentativeG < (gScore.get(stateHash) ?? Infinity)) {
@@ -115,7 +119,9 @@ export class GoapPlanner {
       }
     }
 
-    logger.warn(`No plan found for goal '${goal.name}' after ${iterations} iterations`);
+    logger.warn(
+      `No plan found for goal '${goal.name}' after ${iterations} iterations`,
+    );
     return { success: false, actions: [], totalCost: 0, goalName: goal.name };
   }
 
@@ -151,7 +157,10 @@ export class GoapAgent {
     }
   }
 
-  async tick(worldState: WorldState, context: Record<string, unknown>): Promise<string[]> {
+  async tick(
+    worldState: WorldState,
+    context: Record<string, unknown>,
+  ): Promise<string[]> {
     const executed: string[] = [];
 
     // Remove goals com preconditions inválidas ou (não-persistentes e já satisfeitos)
@@ -173,7 +182,10 @@ export class GoapAgent {
     }
 
     // Executa próxima ação
-    if (this.currentPlan?.success && this.currentPlanIndex < this.currentPlan.actions.length) {
+    if (
+      this.currentPlan?.success &&
+      this.currentPlanIndex < this.currentPlan.actions.length
+    ) {
       const action = this.currentPlan.actions[this.currentPlanIndex]!;
 
       if (worldState.satisfies(action.preconditions)) {
@@ -187,7 +199,8 @@ export class GoapAgent {
               const current = (worldState.facts[key] as number) ?? 0;
               const nv = val as number;
               if (op === "+") worldState.facts[key] = current + nv;
-              else if (op === "-") worldState.facts[key] = Math.max(0, current - nv);
+              else if (op === "-")
+                worldState.facts[key] = Math.max(0, current - nv);
               else if (op === "set") worldState.facts[key] = val;
             } else {
               worldState.facts[key] = value as FactValue;
@@ -225,7 +238,10 @@ export function createDefaultActions(): GoapAction[] {
       durationEstimate: 0.5,
       isReversible: true,
       maxRetries: 3,
-      execute: async () => { logger.info("🔔 ALARME ATIVADO"); return true; },
+      execute: async () => {
+        logger.info("🔔 ALARME ATIVADO");
+        return true;
+      },
     },
     {
       name: "deactivate_alarm",
@@ -235,7 +251,10 @@ export function createDefaultActions(): GoapAction[] {
       durationEstimate: 0.5,
       isReversible: true,
       maxRetries: 3,
-      execute: async () => { logger.info("🔔 Alarme desativado"); return true; },
+      execute: async () => {
+        logger.info("🔔 Alarme desativado");
+        return true;
+      },
     },
     {
       name: "lock_main_door",
@@ -245,7 +264,10 @@ export function createDefaultActions(): GoapAction[] {
       durationEstimate: 2,
       isReversible: true,
       maxRetries: 3,
-      execute: async () => { logger.info("🔒 Porta trancada"); return true; },
+      execute: async () => {
+        logger.info("🔒 Porta trancada");
+        return true;
+      },
     },
     {
       name: "send_notification_owner",
@@ -255,17 +277,29 @@ export function createDefaultActions(): GoapAction[] {
       durationEstimate: 2,
       isReversible: false,
       maxRetries: 2,
-      execute: async () => { logger.info("📱 Notificação enviada"); return true; },
+      execute: async () => {
+        logger.info("📱 Notificação enviada");
+        return true;
+      },
     },
     {
       name: "sound_siren",
       cost: 8,
-      preconditions: { alarm_active: true, threat_level: [">=", 5] as ConditionValue },
-      effects: { threat_level: ["-", 3] as ConditionValue, intrusion_detected: false },
+      preconditions: {
+        alarm_active: true,
+        threat_level: [">=", 5] as ConditionValue,
+      },
+      effects: {
+        threat_level: ["-", 3] as ConditionValue,
+        intrusion_detected: false,
+      },
       durationEstimate: 1,
       isReversible: true,
       maxRetries: 2,
-      execute: async () => { logger.info("🚨 SIRENE"); return true; },
+      execute: async () => {
+        logger.info("🚨 SIRENE");
+        return true;
+      },
     },
     {
       name: "call_emergency",
@@ -275,7 +309,10 @@ export function createDefaultActions(): GoapAction[] {
       durationEstimate: 30,
       isReversible: false,
       maxRetries: 1,
-      execute: async () => { logger.fatal("📞 EMERGÊNCIA"); return true; },
+      execute: async () => {
+        logger.fatal("📞 EMERGÊNCIA");
+        return true;
+      },
     },
     {
       name: "turn_on_lights",
@@ -285,7 +322,10 @@ export function createDefaultActions(): GoapAction[] {
       durationEstimate: 1,
       isReversible: true,
       maxRetries: 3,
-      execute: async () => { logger.info("💡 Luzes acesas"); return true; },
+      execute: async () => {
+        logger.info("💡 Luzes acesas");
+        return true;
+      },
     },
     {
       name: "start_recording",
@@ -295,7 +335,10 @@ export function createDefaultActions(): GoapAction[] {
       durationEstimate: 0.5,
       isReversible: true,
       maxRetries: 3,
-      execute: async () => { logger.info("⏺️ Gravação iniciada"); return true; },
+      execute: async () => {
+        logger.info("⏺️ Gravação iniciada");
+        return true;
+      },
     },
   ];
 }
@@ -323,7 +366,11 @@ export function createDefaultGoals(): Goal[] {
     {
       name: "secure_perimeter",
       priority: 70,
-      targetState: { perimeter_secured: true, main_door_locked: true, garage_door_closed: true },
+      targetState: {
+        perimeter_secured: true,
+        main_door_locked: true,
+        garage_door_closed: true,
+      },
       preconditions: { perimeter_secured: false },
       isPersistent: false,
       ttlSeconds: null,

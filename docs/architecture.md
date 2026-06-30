@@ -6,13 +6,13 @@ O SecurityAgent é um agente cognitivo autônomo que implementa o ciclo **Percei
 
 ### Princípios de Design
 
-| Princípio | Descrição |
-|-----------|-----------|
-| **Assíncrono por padrão** | Cada câmera/mic é um stream independente processado em paralelo |
-| **Event-driven** | Comunicação interna via barramento de eventos (pub/sub) |
-| **Modular desacoplado** | Camadas comunicam-se apenas pelo barramento; cada módulo pode ser substituído |
-| **Latency-aware** | Processamento em tiers: rápido (local) → lento (LLM cloud) |
-| **Graceful degradation** | Se LLM está offline, rules engine assume; se GPU falha, CPU fallback |
+| Princípio                 | Descrição                                                                     |
+| ------------------------- | ----------------------------------------------------------------------------- |
+| **Assíncrono por padrão** | Cada câmera/mic é um stream independente processado em paralelo               |
+| **Event-driven**          | Comunicação interna via barramento de eventos (pub/sub)                       |
+| **Modular desacoplado**   | Camadas comunicam-se apenas pelo barramento; cada módulo pode ser substituído |
+| **Latency-aware**         | Processamento em tiers: rápido (local) → lento (LLM cloud)                    |
+| **Graceful degradation**  | Se LLM está offline, rules engine assume; se GPU falha, CPU fallback          |
 
 ---
 
@@ -203,27 +203,51 @@ rules:
 ### 5.2 GOAP Planner
 
 O GOAP opera com:
+
 - **World State**: conjunto de fatos atuais (pessoas em casa, hora, alarme ativo, etc.)
 - **Goals**: objetivos de segurança (manter perímetro seguro, verificar pessoa desconhecida)
 - **Actions**: ações com preconditions e effects
 - **Planner**: A* search para encontrar sequência de ações que satisfaz o goal
 
-### 5.3 LLM Reasoner
+### 5.3 LLM Client (via vLLM / OpenAI-compatible API)
 
-Usado quando a situação é ambígua ou requer raciocínio complexo:
+O Vigia usa um **único cliente LLM** compatível com qualquer servidor
+que exponha a API `/v1/chat/completions` (vLLM, OpenAI, OpenRouter, etc.).
 
-- **Prompt estruturado** com:
-  - Contexto atual (world state)
-  - Últimos N eventos relevantes
-  - Histórico de ações similares
-  - Embeddings das pessoas envolvidas
+**Arquitetura do cliente:**
 
-- **Output estruturado** (JSON):
-  - `assessment`: avaliação da situação
-  - `threat_level`: nível de ameaça estimado
-  - `suggested_actions`: ações sugeridas
-  - `explanation`: explicação em linguagem natural
-  - `anomaly_score`: quão anômalo é o evento (0..1)
+```
+src/reasoning/llm/client.ts
+  → LlmClient({ baseUrl, apiKey, model, maxTokens, temperature })
+    → new OpenAI({ baseURL, apiKey })
+      → chat.completions.create({ model, messages })
+```
+
+**Princípios:**
+
+- **Provider-less**: não há enum de providers. O `baseUrl` define o servidor.
+- **Single model**: o container vLLM carrega 1 modelo; o código envia exatamente esse nome.
+- **Caminho único**: sem switch/case por provider — um método `generate()` para tudo.
+- **Thinking auto-detect**: se o nome do modelo contém `thinking`, `reasoning`, ou `deepseek-r1`, o cliente envia `extra_body: { enable_thinking: true }`.
+
+**Métodos expostos:**
+
+- `evaluate(event, context)` → `LlmAssessment` (avaliação de ameaça)
+- `generateHypotheses(event, context)` → hipóteses causais
+- `generateDailySummary(events, date)` → resumo diário
+- `generateText(prompt)` → texto livre
+
+**Configuração (`.env`):**
+
+```bash
+LLM_BASE_URL=http://localhost:11434/v1
+LLM_MODEL=minicpm-v4.6
+LLM_API_KEY=                       # opcional para vLLM local
+```
+
+**Fallback determinístico:** se o servidor LLM estiver offline, o sistema
+continua operando com o motor de regras (rules engine). As avaliações
+retornam valores padrão conservadores.
 
 ---
 
@@ -343,19 +367,20 @@ class SecurityAgent:
 
 ### Latency Budget
 
-| Etapa | Latência Alvo | Local |
-|-------|--------------|-------|
-| Captura de frame | < 33ms (30fps) | Edge |
-| Detecção facial | < 50ms (GPU) | Edge |
-| Extração embedding | < 20ms (GPU) | Edge |
-| Match no VectorDB | < 10ms | Edge |
-| Classificação de som | < 100ms | Edge |
-| Rules engine | < 5ms | Edge |
-| GOAP planning | < 50ms (tipicamente) | Edge |
-| LLM evaluation | 500ms-3s | Cloud |
-| Execução de ação | < 100ms | Edge |
+| Etapa                | Latência Alvo        | Local |
+| -------------------- | -------------------- | ----- |
+| Captura de frame     | < 33ms (30fps)       | Edge  |
+| Detecção facial      | < 50ms (GPU)         | Edge  |
+| Extração embedding   | < 20ms (GPU)         | Edge  |
+| Match no VectorDB    | < 10ms               | Edge  |
+| Classificação de som | < 100ms              | Edge  |
+| Rules engine         | < 5ms                | Edge  |
+| GOAP planning        | < 50ms (tipicamente) | Edge  |
+| LLM evaluation       | 500ms-3s             | Cloud |
+| Execução de ação     | < 100ms              | Edge  |
 
 ### Otimizações
+
 - **Frame skipping**: processar 1 a cada N frames para detecção facial (rostos não se movem tão rápido)
 - **Resolução adaptativa**: reduzir resolução para detecção, aumentar para reconhecimento
 - **Model quantization**: INT8/FP16 para inferência GPU

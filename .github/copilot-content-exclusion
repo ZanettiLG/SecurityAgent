@@ -1,0 +1,36 @@
+# GitHub Copilot Content Exclusion
+
+Files and directories listed here will NEVER be sent to the Copilot model.
+This is the definitive defense against leaking sensitive data via Copilot.
+
+## Environment files with secrets
+
+.env
+.env.\*
+!.env.example
+
+## Cloud/Service credentials
+
+_credentials_.json
+_service-account_.json
+_.pem
+_.key
+
+## Dependencies (excluded to save tokens — hundreds of thousands of lines)
+
+node_modules/
+
+## Build artifacts
+
+dist/
+build/
+.next/
+out/
+
+## Coverage reports
+
+coverage/
+
+## Generated files
+
+backend/src/generated/

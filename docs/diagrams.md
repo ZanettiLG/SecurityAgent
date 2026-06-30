@@ -45,7 +45,7 @@ flowchart TB
     subgraph Reasoning["🤔 Raciocínio"]
         RE["Rules Engine\n(< 5ms)"]
         GP["GOAP Planner\n(A* Search)"]
-        LLM["LLM Reasoner\n(GPT-4o/Claude)"]
+        LLM["LlmClient<br/>(vLLM OpenAI-compatible)"]
     end
 
     subgraph Actions["⚡ Ações"]

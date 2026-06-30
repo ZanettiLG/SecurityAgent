@@ -1,0 +1,27 @@
+name: Gitleaks Secret Scan
+on:
+  pull_request:
+    branches: [main, master]
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  scan:
+    name: Scan for secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks (Docker)
+        run: |
+          docker run -v ${{ github.workspace }}:/path \
+            ghcr.io/gitleaks/gitleaks:latest \
+            detect --source=/path --no-git -v \
+            --config /path/.gitleaks.toml

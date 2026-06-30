@@ -1,0 +1,16 @@
+# Gitleaks configuration for SecurityAgent
+# Allow known documentation/tutorial example secrets
+
+[allowlist]
+  description = "Known example secrets in documentation files"
+
+  # Tutorial/example passwords in documentation
+  regexes = [
+    '''POSTGRES_PASSWORD=SUA_SENHA_AQUI''',
+    '''DB_PASSWORD:\s+U1VBX1NFTkhBX0FRVUk=''',
+  ]
+
+  # Documentation files
+  paths = [
+    '''docs/knowledges/docker-ci-cd/.*''',
+  ]

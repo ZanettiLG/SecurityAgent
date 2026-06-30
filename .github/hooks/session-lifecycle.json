@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "type": "command",
+        "command": "node .github/scripts/prompt-auditor.js",
+        "timeout": 5
+      }
+    ],
+    "PreCompact": [
+      {
+        "type": "command",
+        "command": "node .github/scripts/memory-refiner.js",
+        "timeout": 15
+      }
+    ]
+  }
+}

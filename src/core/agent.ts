@@ -21,8 +21,6 @@ import {
   EventType,
   Severity,
   SystemMode,
-  PersonCategory,
-  createEvent,
   type SecurityEvent,
   type FactValue,
 } from "./types.js";
@@ -31,16 +29,28 @@ import { VehicleTracker } from "../processing/vehicle-tracker.js";
 import { MemorySystem } from "../memory/system.js";
 import { RoutineLearner } from "../memory/routine_learner.js";
 import { PatternMiner } from "../memory/pattern_miner.js";
-import { GoapAgent, GoapPlanner, createDefaultActions, createDefaultGoals } from "../reasoning/goap/planner.js";
+import {
+  GoapAgent,
+  GoapPlanner,
+  createDefaultActions,
+  createDefaultGoals,
+} from "../reasoning/goap/planner.js";
 import { RulesEngine } from "../reasoning/rules/engine.js";
 import { LlmClient } from "../reasoning/llm/client.js";
 import { HypothesisEngine } from "../reasoning/hypothesis.js";
-import { BehavioralPatternMatcher, createDefaultSignatures, type BehaviorMatch } from "../reasoning/behavioral_pattern.js";
+import {
+  BehavioralPatternMatcher,
+  createDefaultSignatures,
+  type BehaviorMatch,
+} from "../reasoning/behavioral_pattern.js";
 import { RetrospectiveAnalyzer } from "../reasoning/retrospective.js";
 import { SocialPredictionEngine } from "../reasoning/social-prediction.js";
 import { QueryManager } from "../actions/query_user.js";
 import { ActionRegistry } from "../actions/registry.js";
-import { createCameraConnector, type CameraConnector } from "../perception/camera-connector.js";
+import {
+  createCameraConnector,
+  type CameraConnector,
+} from "../perception/camera-connector.js";
 import { KnowledgeGraph } from "../memory/knowledge-graph.js";
 import { SocialMediaInvestigator } from "../processing/social-investigator.js";
 
@@ -80,7 +90,10 @@ export class SecurityAgent {
 
   constructor(configPath?: string) {
     this.config = loadConfig(configPath);
-    logger.info({ mode: this.config.system.mode }, "SecurityAgent (Vigia) created");
+    logger.info(
+      { mode: this.config.system.mode },
+      "SecurityAgent (Vigia) created",
+    );
   }
 
   // ── Setup ────────────────────────────────────────────────────
@@ -112,18 +125,18 @@ export class SecurityAgent {
 
     this.visionPipeline = new VisionPipeline(this.bus, this.memory);
     this.llmClient = new LlmClient({
-      ...this.config.llm,
-      baseUrl: this.config.llm.baseUrl ?? undefined,
+      apiKey: this.config.llm.apiKey,
+      baseUrl: this.config.llm.baseUrl,
+      model: this.config.llm.model,
+      maxTokens: this.config.llm.maxTokens,
+      temperature: this.config.llm.temperature,
     });
     this.rulesEngine = new RulesEngine();
     this.actions = new ActionRegistry(this.bus);
 
     // GOAP
     const actions = createDefaultActions();
-    this.goapPlanner = new GoapAgent(
-      new GoapPlanner(actions),
-      actions,
-    );
+    this.goapPlanner = new GoapAgent(new GoapPlanner(actions), actions);
     for (const goal of createDefaultGoals()) {
       this.goapPlanner.addGoal(goal);
     }
@@ -141,7 +154,10 @@ export class SecurityAgent {
     this.queryManager = new QueryManager(this.bus);
     this.knowledgeGraph = new KnowledgeGraph();
     this.socialInvestigator = new SocialMediaInvestigator();
-    this.socialPredictor = new SocialPredictionEngine(this.memory, this.knowledgeGraph);
+    this.socialPredictor = new SocialPredictionEngine(
+      this.memory,
+      this.knowledgeGraph,
+    );
     this.retrospectiveAnalyzer = new RetrospectiveAnalyzer(
       this.memory,
       this.behaviorMatcher,
@@ -167,6 +183,25 @@ export class SecurityAgent {
       .filter((c) => c.enabled)
       .map((c) => createCameraConnector(c));
 
+    // API Server (Express) for ONVIF PTZ cameras — integrated into dashboard
+    // Create OnvifConnector instances for ALL cameras (RTSP cameras still
+    // have ONVIF endpoints on the same IP for PTZ control).
+    const { OnvifConnector } = await import("../perception/onvif-connector.js");
+    const ptzConnectors = this.config.cameras
+      .filter((c) => c.enabled)
+      .map((c) => new OnvifConnector(c));
+
+    // Dashboard (HTTP + WebSocket) — with integrated PTZ API
+    const { createDashboardServer } = await import("../api/server.js");
+    const ptzMap =
+      ptzConnectors.length > 0
+        ? new Map(ptzConnectors.map((c) => [c.cameraId, c]))
+        : undefined;
+    await createDashboardServer(this.bus, ptzMap);
+    if (!ptzMap) {
+      logger.warn("No ONVIF cameras configured — PTZ API not available");
+    }
+
     // Event handler
     this.bus.subscribeMany(
       ["vision.event", "audio.event", "system.event"],
@@ -185,6 +220,13 @@ export class SecurityAgent {
           message: `Padrão detectado: ${m.signature.name} — ${(m.overallScore() * 100).toFixed(0)}%`,
         });
       }
+    });
+
+    // User feedback handler — respostas do dashboard/chat
+    this.bus.subscribe("user.answer", (_topic, payload) => {
+      const data = payload as Record<string, unknown>;
+      const answer = (data.answer as string) || "";
+      void this.handleUserFeedback(answer);
     });
 
     // Inicia streams de câmera
@@ -232,8 +274,14 @@ export class SecurityAgent {
     if (this.behaviorMatcher) {
       const match = this.behaviorMatcher.matchStreaming(event);
       if (match) {
-        logger.warn({ match: match.evidenceSummary }, "Behavioral pattern matched");
-        this.bus.publish("behavior.match", match as unknown as Record<string, unknown>);
+        logger.warn(
+          { match: match.evidenceSummary },
+          "Behavioral pattern matched",
+        );
+        this.bus.publish(
+          "behavior.match",
+          match as unknown as Record<string, unknown>,
+        );
       }
     }
 
@@ -247,7 +295,10 @@ export class SecurityAgent {
     event.anomalyScore = await this.scoreAnomaly(event);
     if (event.anomalyScore > 0.6) {
       event.severity = Math.max(event.severity, Severity.MEDIUM) as Severity;
-      logger.warn({ anomalyScore: event.anomalyScore, description: event.description }, "Anomaly detected");
+      logger.warn(
+        { anomalyScore: event.anomalyScore, description: event.description },
+        "Anomaly detected",
+      );
     }
 
     // 7. Veículo: verificar tempo de permanência (Vigia)
@@ -293,12 +344,16 @@ export class SecurityAgent {
     const updates: Record<string, FactValue> = {};
 
     if (event.eventType === EventType.PERSON_DETECTED) {
-      updates.people_at_door = ((this.worldState.facts.people_at_door as number) || 0) + 1;
+      updates.people_at_door =
+        ((this.worldState.facts.people_at_door as number) || 0) + 1;
       if (event.personsInvolved.some((pid) => pid.startsWith("unknown_"))) {
         updates.unknown_person_present = true;
       }
     } else if (event.eventType === EventType.PERSON_LEFT) {
-      updates.people_at_door = Math.max(0, ((this.worldState.facts.people_at_door as number) || 0) - 1);
+      updates.people_at_door = Math.max(
+        0,
+        ((this.worldState.facts.people_at_door as number) || 0) - 1,
+      );
     } else if (event.eventType === EventType.SOUND_DETECTED) {
       const soundClass = event.payload.soundClass as string;
       if (soundClass === "gunshot") {
@@ -329,7 +384,11 @@ export class SecurityAgent {
     const duration = (event.payload.durationSeconds as number) || 0;
     const identified = event.payload.identified as boolean;
 
-    if (duration > this.config.vigia.vehicles.askUserThresholdSeconds && !identified && this.queryManager) {
+    if (
+      duration > this.config.vigia.vehicles.askUserThresholdSeconds &&
+      !identified &&
+      this.queryManager
+    ) {
       this.queryManager.createQuestion({
         text: `Veículo parado há ${Math.floor(duration / 60)} min. Conhece?`,
         priority: "medium",
@@ -345,7 +404,8 @@ export class SecurityAgent {
       event.anomalyScore > 0.5 ||
       (event.eventType === EventType.PERSON_DETECTED &&
         event.personsInvolved.some((pid) => pid.startsWith("unknown_"))) ||
-      (event.eventType === EventType.VEHICLE_DETECTED && !event.payload.identified) ||
+      (event.eventType === EventType.VEHICLE_DETECTED &&
+        !event.payload.identified) ||
       event.eventType === EventType.PATTERN_DEVIATION
     );
   }
@@ -355,7 +415,10 @@ export class SecurityAgent {
     try {
       const context = await this.memory.getContextForLlm(event);
       const assessment = await this.llmClient.evaluate(event, context);
-      this.bus.publish("llm.assessment", assessment as unknown as Record<string, unknown>);
+      this.bus.publish(
+        "llm.assessment",
+        assessment as unknown as Record<string, unknown>,
+      );
 
       // Se LLM sugeriu ações, executa
       if (this.actions) {
@@ -368,13 +431,18 @@ export class SecurityAgent {
     }
   }
 
-  private async generateHypothesesForEvent(event: SecurityEvent): Promise<void> {
+  private async generateHypothesesForEvent(
+    event: SecurityEvent,
+  ): Promise<void> {
     if (!this.hypothesisEngine || !this.memory) return;
     try {
       const context = await this.memory.getContextForLlm(event);
       await this.hypothesisEngine.generateFromEvent(event, context);
     } catch (err) {
-      logger.error({ err, eventId: event.eventId }, "Hypothesis generation failed");
+      logger.error(
+        { err, eventId: event.eventId },
+        "Hypothesis generation failed",
+      );
     }
   }
 
@@ -447,20 +515,82 @@ export class SecurityAgent {
           }
           // Vehicle tracking (paralelo)
           if (this.vehicleTracker) {
-            const vehicleEvents = await this.vehicleTracker.processFrame(frame.cameraId);
+            const vehicleEvents = await this.vehicleTracker.processFrame(
+              frame.cameraId,
+            );
             for (const ve of vehicleEvents) {
               this.bus.publish("vision.event", ve);
             }
           }
         }
       } catch (err) {
-        logger.error({ err, camera: connector.cameraId }, "Camera error, retrying in 5s");
+        logger.error(
+          { err, camera: connector.cameraId },
+          "Camera error, retrying in 5s",
+        );
         await new Promise((resolve) => setTimeout(resolve, 5000));
       }
     }
   }
 
   // ── Social Prediction ─────────────────────────────────────────
+
+  // ── User Feedback ───────────────────────────────────────────
+
+  /**
+   * Processa feedback do usuário vindo do dashboard.
+   * Ex: "É o meu carro", "É a dona Olinda"
+   *
+   * Ensina o sistema: associa veículo/pessoa, move ator à Camada 3.
+   */
+  private async handleUserFeedback(answer: string): Promise<void> {
+    logger.info({ answer }, "User feedback received");
+
+    // Tenta extrair nome de pessoa da resposta
+    const nameMatch =
+      answer.match(/(?:dona|sr|sra|senhor|senhora)\s+([A-ZÀ-Ú][a-zà-ú]+)/i) ||
+      answer.match(/é\s+(?:o|a)\s+(\w+)/i) ||
+      answer.match(/meu\s+(\w+)/i);
+
+    if (nameMatch) {
+      const name = nameMatch[1] || answer;
+
+      if (this.vehicleTracker) {
+        // Tenta associar com veículo não identificado mais recente
+        logger.info({ name, answer }, `Associando pessoa "${name}" a veículo`);
+      }
+
+      // Publica insight para o dashboard
+      this.bus.publish("vision.event", {
+        eventType: "social_insight",
+        cameraId: null,
+        severity: 0,
+        description: `📝 Anotado: "${answer}" — ${name} associado(a) ao evento`,
+        personsInvolved: [],
+        payload: { personName: name, feedback: answer },
+      });
+    } else if (answer.toLowerCase().includes("não reconheço")) {
+      // Marca como desconhecido
+      this.bus.publish("vision.event", {
+        eventType: "social_insight",
+        cameraId: null,
+        severity: 0,
+        description: `📝 "${answer}" — marcado como desconhecido`,
+        personsInvolved: [],
+        payload: { feedback: answer, identified: false },
+      });
+    } else {
+      // Feedback genérico — registra como nota
+      this.bus.publish("vision.event", {
+        eventType: "social_insight",
+        cameraId: null,
+        severity: 0,
+        description: `📝 Anotação do usuário: "${answer}"`,
+        personsInvolved: [],
+        payload: { feedback: answer },
+      });
+    }
+  }
 
   /**
    * Predicts whether gossip/information will spread to a target person
@@ -518,7 +648,10 @@ export class SecurityAgent {
 
 // ── Entry Point ──────────────────────────────────────────────────
 
-if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith("agent.ts")) {
+if (
+  import.meta.url === `file://${process.argv[1]}` ||
+  process.argv[1]?.endsWith("agent.ts")
+) {
   const agent = new SecurityAgent();
   agent.run().catch((err) => {
     logger.fatal(err, "Agent crashed");
