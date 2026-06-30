@@ -3,7 +3,18 @@ titulo: "Aula 05: Docker Swarm — Orquestração Nativa em Cluster"
 modulo: "Docker, Docker Compose e Registry"
 duracao_estimada: "120 minutos"
 nivel: "intermediario-avancado"
-tags: [docker, swarm, orquestracao, cluster, raft, services, secrets, rolling-update, stack-deploy]
+tags:
+  [
+    docker,
+    swarm,
+    orquestracao,
+    cluster,
+    raft,
+    services,
+    secrets,
+    rolling-update,
+    stack-deploy,
+  ]
 data: 2026-06-18
 ---
 
@@ -52,27 +63,26 @@ Ao longo do caminho, você encontrará seções **"Mão na Massa"** com passos p
 
 Este diagrama mostra todos os conceitos que você vai dominar nesta aula:
 
-
 ![Mapa mental: Docker Swarm — Orquestração Nativa em Cluster](images/diagrama-01-mindmap.png)
 
 ---
 
 ## Recapitulação das Aulas Anteriores
 
-| Aula | Conceito | Onde aparece nesta aula | Como se conecta |
-|---|---|---|---|
-| Aula 01 | **Dockerfile multi-stage** (Seção 10) | Seções 8-9 — imagem buildada | A mesma imagem que você construiu é usada no cluster — o Swarm não reinventa o build |
-| Aula 02 | **docker-compose.yml** (Seção 8) | Seção 9 — stack deploy | O stack YAML é uma evolução direta do Compose com as chaves `deploy:` — você já tem 80% do arquivo pronto |
-| Aula 02 | **DNS interno** (Seção 2) | Seção 7 — overlay network | O DNS por nome de serviço que você viu na bridge agora escala para múltiplos hosts com overlay |
-| Aula 03 | **Registry e tags SemVer** (Seção 4) | Seções 8-10 — `docker service update --image` | O rolling update puxa a nova tag da imagem do registry — versionamento não é opcional |
-| Aula 03 | **GitHub Actions push** (Seção 7) | Seção 9 — pipeline CI/CD | O workflow que builda e publica a imagem agora pode disparar o deploy no Swarm automaticamente |
-| Aula 04 | **Pipeline multi-ambiente** (Seção 4) | Seção 10 — staging vs production | Ambientes do GitHub Actions mapeiam para stacks separadas no Swarm com secrets diferentes |
+| Aula    | Conceito                              | Onde aparece nesta aula                       | Como se conecta                                                                                           |
+| ------- | ------------------------------------- | --------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Aula 01 | **Dockerfile multi-stage** (Seção 10) | Seções 8-9 — imagem buildada                  | A mesma imagem que você construiu é usada no cluster — o Swarm não reinventa o build                      |
+| Aula 02 | **docker-compose.yml** (Seção 8)      | Seção 9 — stack deploy                        | O stack YAML é uma evolução direta do Compose com as chaves `deploy:` — você já tem 80% do arquivo pronto |
+| Aula 02 | **DNS interno** (Seção 2)             | Seção 7 — overlay network                     | O DNS por nome de serviço que você viu na bridge agora escala para múltiplos hosts com overlay            |
+| Aula 03 | **Registry e tags SemVer** (Seção 4)  | Seções 8-10 — `docker service update --image` | O rolling update puxa a nova tag da imagem do registry — versionamento não é opcional                     |
+| Aula 03 | **GitHub Actions push** (Seção 7)     | Seção 9 — pipeline CI/CD                      | O workflow que builda e publica a imagem agora pode disparar o deploy no Swarm automaticamente            |
+| Aula 04 | **Pipeline multi-ambiente** (Seção 4) | Seção 10 — staging vs production              | Ambientes do GitHub Actions mapeiam para stacks separadas no Swarm com secrets diferentes                 |
 
 ---
 
 **FUNDAMENTOS: Mecanismos Universais de Orquestração em Cluster**
 
-> *"Os conceitos desta seção são universais — valem para qualquer orquestrador de containers. Na segunda parte, você verá como o Docker Swarm implementa cada um deles. Aqui, o foco está no 'por que' e 'como funciona', ancorado em problemas que você já enfrentou com single-host."*
+> _"Os conceitos desta seção são universais — valem para qualquer orquestrador de containers. Na segunda parte, você verá como o Docker Swarm implementa cada um deles. Aqui, o foco está no 'por que' e 'como funciona', ancorado em problemas que você já enfrentou com single-host."_
 
 ---
 
@@ -98,10 +108,9 @@ O orquestrador resolve os três problemas acima simultaneamente:
 - **Escalabilidade horizontal**: você diz "quero 5 instâncias da API" e o orquestrador distribui entre os nós disponíveis
 - **Deploy sem downtime**: você atualiza uma réplica por vez enquanto as outras continuam atendendo tráfego
 
-
 ![Diagrama: Single host (um ponto de falha) vs Cluster (múltiplos nós, alta disponibilidade)](images/diagrama-02-diagram.png)
 
-> *"Single host é um monociclo: elegante, mas se algo quebra, você cai. Cluster é um carro com 4 rodos: se um pneu fura, os outros três levam você até o borracheiro."*
+> _"Single host é um monociclo: elegante, mas se algo quebra, você cai. Cluster é um carro com 4 rodos: se um pneu fura, os outros três levam você até o borracheiro."_
 
 ### Quick Check 1
 
@@ -140,10 +149,9 @@ O **reconciliation loop** é o motor que faz o estado desejado virar realidade. 
 
 Esse loop roda **para sempre**, não apenas uma vez. Se uma réplica falha, o loop detecta no passo 1 (estado atual = réplicas a menos) e cria uma nova no passo 3. Se você atualiza a imagem, o loop detecta a diferença e substitui as réplicas gradualmente.
 
-
 ![Diagrama: Reconciliation loop — observe, diff, act em ciclo contínuo](images/diagrama-03-diagram.png)
 
-> *"Reconciliation loop é o termostato da sua aplicação. Você programa a temperatura desejada (22°C). O termostato mede a temperatura atual, compara com a desejada e liga/desliga o ar condicionado para convergir. E continua medindo — para sempre."*
+> _"Reconciliation loop é o termostato da sua aplicação. Você programa a temperatura desejada (22°C). O termostato mede a temperatura atual, compara com a desejada e liga/desliga o ar condicionado para convergir. E continua medindo — para sempre."_
 
 ### Quick Check 2
 
@@ -182,15 +190,15 @@ O orquestrador gerencia o ciclo de vida completo de cada réplica: criação, mo
 
 ### Comparação
 
-| Aspecto | Container (`docker run`) | Serviço Gerenciado |
-|---|---|---|
-| Ciclo de vida | Até o processo terminar | Perpétuo — orquestrador mantém |
-| Falha | Container morre | Reconciliation loop recria |
-| Escala | Manual (novo `docker run`) | Declarativa (`--replicas 5`) |
-| Distribuição | Apenas no host local | Distribuído entre nós do cluster |
-| Atualização | `docker stop` + `docker run` | Rolling update automático |
+| Aspecto       | Container (`docker run`)     | Serviço Gerenciado               |
+| ------------- | ---------------------------- | -------------------------------- |
+| Ciclo de vida | Até o processo terminar      | Perpétuo — orquestrador mantém   |
+| Falha         | Container morre              | Reconciliation loop recria       |
+| Escala        | Manual (novo `docker run`)   | Declarativa (`--replicas 5`)     |
+| Distribuição  | Apenas no host local         | Distribuído entre nós do cluster |
+| Atualização   | `docker stop` + `docker run` | Rolling update automático        |
 
-> *"Container é um operário individual: trabalha enquanto está de pé, se cair precisa de alguém para levantar. Serviço é um turno inteiro de fábrica: o supervisor garante que sempre haja N operários trabalhando, substitui quem cai e troca o turno gradualmente sem parar a produção."*
+> _"Container é um operário individual: trabalha enquanto está de pé, se cair precisa de alguém para levantar. Serviço é um turno inteiro de fábrica: o supervisor garante que sempre haja N operários trabalhando, substitui quem cai e troca o turno gradualmente sem parar a produção."_
 
 ### Quick Check 3
 
@@ -224,10 +232,9 @@ Além do DNS round-robin, o orquestrador implementa um **load balancer interno**
 
 Isso significa que você pode apontar um único IP (o de qualquer nó do cluster) e o tráfego será balanceado automaticamente entre todas as réplicas, independentemente de onde elas estão rodando.
 
-
 ![Diagrama: Load balancer distribui requisições entre réplicas em nós diferentes, todas acessam o mesmo banco via overlay network](images/diagrama-04-diagram.png)
 
-> *"Overlay network é um túnel privado entre todos os nós do cluster. O container não sabe se sua réplica vizinha está no mesmo host ou em outro continente — o túnel faz parecer que estão na mesma máquina."*
+> _"Overlay network é um túnel privado entre todos os nós do cluster. O container não sabe se sua réplica vizinha está no mesmo host ou em outro continente — o túnel faz parecer que estão na mesma máquina."_
 
 ### Quick Check 4
 
@@ -264,10 +271,9 @@ Você tem 5 réplicas da API rodando. Você publicou uma nova versão (`1.2.0`) 
 
 Se a nova versão apresenta problemas (erro em produção, degradação de performance), o **rollback** reverte todas as réplicas para a versão anterior em um único comando. O orquestrador mantém o histórico da última configuração estável.
 
-
 ![Diagrama: Rolling update — réplicas substituídas uma a uma, sem downtime](images/diagrama-05-diagram.png)
 
-> *"Rolling update é como trocar os pneus de um carro em movimento: você levanta uma roda por vez, troca o pneu, abaixa e passa para a próxima. O carro nunca para. Rollback é voltar para os pneus anteriores — se o novo pneu furou na primeira curva."*
+> _"Rolling update é como trocar os pneus de um carro em movimento: você levanta uma roda por vez, troca o pneu, abaixa e passa para a próxima. O carro nunca para. Rollback é voltar para os pneus anteriores — se o novo pneu furou na primeira curva."_
 
 ### Quick Check 5
 
@@ -311,7 +317,7 @@ Variáveis de ambiente são visíveis em:
 
 Em cluster, o padrão é **sempre** usar secrets para dados sensíveis e configs para dados não sensíveis.
 
-> *"Secrets são o cofre do cluster. Variáveis de ambiente são post-its na tela do monitor — todo mundo vê. Secrets são documentos dentro do cofre — só quem tem a chave (e permissão) acessa."*
+> _"Secrets são o cofre do cluster. Variáveis de ambiente são post-its na tela do monitor — todo mundo vê. Secrets são documentos dentro do cofre — só quem tem a chave (e permissão) acessa."_
 
 ### Quick Check 6
 
@@ -325,7 +331,7 @@ Em cluster, o padrão é **sempre** usar secrets para dados sensíveis e configs
 
 **APLICAÇÃO: Docker Swarm — Orquestração em Cluster Nativa do Docker**
 
-> *"Agora que você entende os mecanismos universais de orquestração — estado desejado, reconciliation loop, serviços gerenciados, service discovery, rolling updates e secrets — vamos conectá-los à prática com o Docker Swarm, o orquestrador nativo embutido no Docker Engine."*
+> _"Agora que você entende os mecanismos universais de orquestração — estado desejado, reconciliation loop, serviços gerenciados, service discovery, rolling updates e secrets — vamos conectá-los à prática com o Docker Swarm, o orquestrador nativo embutido no Docker Engine."_
 
 ---
 
@@ -348,7 +354,6 @@ Os managers usam o algoritmo **Raft** para manter o estado do cluster consistent
 - Se o manager líder falha, outro manager assume automaticamente
 - Com N managers, o cluster tolera a falha de até (N-1)/2 managers (ex: 3 managers toleram 1 falha)
 
-
 ![Diagrama: Arquitetura Swarm — managers com consenso Raft, workers executando réplicas](images/diagrama-06-diagram.png)
 
 ### Mão na Massa 1 — Inicializando o Cluster Swarm
@@ -363,6 +368,7 @@ docker swarm init --advertise-addr 127.0.0.1
 ```
 
 Output esperado:
+
 ```
 Swarm initialized: current node (xxxxx) is now a manager.
 To add a worker to this swarm, run the following command:
@@ -376,6 +382,7 @@ docker node ls
 ```
 
 Output esperado:
+
 ```
 ID                            HOSTNAME   STATUS    AVAILABILITY   MANAGER STATUS   ENGINE VERSION
 xxxxx *                       hostname   Ready     Active         Reachable        24.0.0
@@ -454,6 +461,7 @@ docker service ls
 ```
 
 Output esperado:
+
 ```
 ID             NAME        MODE         REPLICAS   IMAGE
 xxxxx          api-nginx   replicated   3/3        nginx:alpine
@@ -468,6 +476,7 @@ docker service ps api-nginx
 ```
 
 Output esperado:
+
 ```
 ID             NAME            IMAGE          NODE          DESIRED STATE   CURRENT STATE
 xxxxx          api-nginx.1     nginx:alpine   worker1       Running         Running about a minute
@@ -544,11 +553,11 @@ services:
 Crie `stack.yml` no diretório do projeto:
 
 ```yaml
-version: '3.8'
+version: "3.8"
 
 services:
   api:
-    image: seu-usuario/minha-api:1.0.0  # Substitua pela sua imagem do Docker Hub
+    image: seu-usuario/minha-api:1.0.0 # Substitua pela sua imagem do Docker Hub
     ports:
       - "3000:3000"
     environment:
@@ -582,7 +591,7 @@ services:
       replicas: 1
       placement:
         constraints:
-          - node.role == manager  # DB em nó estável
+          - node.role == manager # DB em nó estável
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
       interval: 5s
@@ -597,7 +606,7 @@ volumes:
 **Passo 2: Criar o arquivo .env**
 
 ```bash
-POSTGRES_PASSWORD=minhasenhaforte123
+POSTGRES_PASSWORD=SUA_SENHA_AQUI
 POSTGRES_DB=meubanco
 POSTGRES_USER=postgres
 ```
@@ -608,9 +617,9 @@ POSTGRES_USER=postgres
 docker stack deploy -c stack.yml --env-file .env minha-app
 ```
 
-> *Importante: `depends_on` é silenciosamente ignorado pelo `docker stack deploy`. No Swarm, a ordem de inicialização é gerenciada pelo scheduler com base em health checks, não por dependências declarativas. Seus serviços precisam tolerar a ausência temporária das dependências (retry, circuit breaker).*
+> _Importante: `depends_on` é silenciosamente ignorado pelo `docker stack deploy`. No Swarm, a ordem de inicialização é gerenciada pelo scheduler com base em health checks, não por dependências declarativas. Seus serviços precisam tolerar a ausência temporária das dependências (retry, circuit breaker)._
 
-> *Diferente do `docker compose up`, o `docker stack deploy` NÃO carrega automaticamente o arquivo `.env`. Use `--env-file .env` explicitamente.*
+> _Diferente do `docker compose up`, o `docker stack deploy` NÃO carrega automaticamente o arquivo `.env`. Use `--env-file .env` explicitamente._
 
 **Passo 4: Verificar a stack**
 
@@ -654,9 +663,9 @@ No stack.yml você configurou:
 
 ```yaml
 update_config:
-  parallelism: 1       # Uma réplica por vez
-  delay: 10s           # Aguarda 10s entre lotes
-  failure_action: rollback  # Se falhar, reverte automaticamente
+  parallelism: 1 # Uma réplica por vez
+  delay: 10s # Aguarda 10s entre lotes
+  failure_action: rollback # Se falhar, reverte automaticamente
 ```
 
 Isso significa que, ao atualizar a imagem, o Swarm vai:
@@ -806,7 +815,7 @@ services:
 
 secrets:
   db_password:
-    external: true  # Secret criado manualmente com `docker secret create`
+    external: true # Secret criado manualmente com `docker secret create`
 ```
 
 ### Configs vs Secrets
@@ -960,7 +969,7 @@ Em seguida, execute um rolling update manual trocando a imagem para `nginx:alpin
 
 ```yaml
 # stack-exercicio.yml
-version: '3.8'
+version: "3.8"
 
 services:
   api:
@@ -1012,7 +1021,7 @@ Converta o `docker-compose.yml` completo da Aula 02 (API + PostgreSQL + healthch
 
 ```yaml
 # stack-completo.yml
-version: '3.8'
+version: "3.8"
 
 services:
   api:
@@ -1192,27 +1201,30 @@ R: Swarm é mais simples de configurar (embutido no Docker Engine, sem instalaç
 
 ## Glossário
 
-| Termo | Definição |
-|---|---|
-| **Cluster** | Conjunto de máquinas (nós) que se comportam como um único recurso computacional coordenado por um orquestrador (Seção 1) |
-| **Config** (*config*) | Dados não sensíveis gerenciados pelo Swarm, montados como arquivo no container. Criptografado apenas em trânsito (Seção 11) |
-| **Desired state** | Estado desejado declarado no YAML — o orquestrador converge o estado atual para este estado continuamente (Seção 2) |
-| **DNS round-robin** | Mecanismo de service discovery onde o DNS retorna todos os IPs das réplicas em ordem alternada (Seção 4) |
-| **Manager node** | Nó do Swarm que executa o control plane: gerencia estado, agenda serviços, mantém consenso Raft (Seção 7) |
-| **Mesh routing** | Mecanismo do Swarm onde qualquer nó que recebe uma requisição encaminha para uma réplica saudável (Seção 4) |
-| **Nó** (*node*) | Máquina membro do cluster Swarm, pode ser manager ou worker (Seção 7) |
-| **Orquestrador** | Software que gerencia o ciclo de vida de containers em cluster: scheduling, self-healing, scaling, updates (Seção 1) |
-| **Overlay network** | Rede virtual que atravessa múltiplos hosts, permitindo comunicação entre containers em nós diferentes (Seção 4) |
-| **Raft** | Algoritmo de consenso distribuído que mantém o estado do cluster consistente entre managers (Seção 7) |
-| **Reconciliation loop** | Ciclo contínuo observe → diff → act que mantém o estado atual convergindo para o estado desejado (Seção 2) |
-| **Réplica** | Instância de um container gerenciado por um serviço. Várias réplicas do mesmo serviço distribuem tráfego (Seção 3) |
-| **Rollback** | Reversão de todas as réplicas de um serviço para a versão anterior, em um único comando (Seção 5) |
-| **Rolling update** | Atualização gradual de réplicas, uma ou algumas por vez, sem downtime (Seção 5) |
-| **Secret** | Dado sensível (senha, token) gerenciado pelo Swarm: criptografado em trânsito e repouso, montado em /run/secrets/ (Seção 6) |
-| **Self-healing** | Capacidade do orquestrador de recriar automaticamente réplicas que falham (Seção 3) |
-| **Service** | Abstração que declara estado desejado de uma aplicação: número de réplicas, imagem, portas, políticas (Seção 3) |
-| **Service discovery** | Mecanismo que permite que serviços se encontrem pelo nome em vez de endereço IP (Seção 4) |
-| **Stack** | Conjunto de serviços relacionados que compõem uma aplicação completa, implantada como unidade (Seção 9) |
-| **Stack deploy** | Comando que implanta uma stack completa no Swarm a partir de um arquivo YAML (Seção 9) |
-| **Worker node** | Nó do Swarm que executa apenas workloads (containers). Não participa do gerenciamento do cluster (Seção 7) |
+| Termo                   | Definição                                                                                                                   |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| **Cluster**             | Conjunto de máquinas (nós) que se comportam como um único recurso computacional coordenado por um orquestrador (Seção 1)    |
+| **Config** (_config_)   | Dados não sensíveis gerenciados pelo Swarm, montados como arquivo no container. Criptografado apenas em trânsito (Seção 11) |
+| **Desired state**       | Estado desejado declarado no YAML — o orquestrador converge o estado atual para este estado continuamente (Seção 2)         |
+| **DNS round-robin**     | Mecanismo de service discovery onde o DNS retorna todos os IPs das réplicas em ordem alternada (Seção 4)                    |
+| **Manager node**        | Nó do Swarm que executa o control plane: gerencia estado, agenda serviços, mantém consenso Raft (Seção 7)                   |
+| **Mesh routing**        | Mecanismo do Swarm onde qualquer nó que recebe uma requisição encaminha para uma réplica saudável (Seção 4)                 |
+| **Nó** (_node_)         | Máquina membro do cluster Swarm, pode ser manager ou worker (Seção 7)                                                       |
+| **Orquestrador**        | Software que gerencia o ciclo de vida de containers em cluster: scheduling, self-healing, scaling, updates (Seção 1)        |
+| **Overlay network**     | Rede virtual que atravessa múltiplos hosts, permitindo comunicação entre containers em nós diferentes (Seção 4)             |
+| **Raft**                | Algoritmo de consenso distribuído que mantém o estado do cluster consistente entre managers (Seção 7)                       |
+| **Reconciliation loop** | Ciclo contínuo observe → diff → act que mantém o estado atual convergindo para o estado desejado (Seção 2)                  |
+| **Réplica**             | Instância de um container gerenciado por um serviço. Várias réplicas do mesmo serviço distribuem tráfego (Seção 3)          |
+| **Rollback**            | Reversão de todas as réplicas de um serviço para a versão anterior, em um único comando (Seção 5)                           |
+| **Rolling update**      | Atualização gradual de réplicas, uma ou algumas por vez, sem downtime (Seção 5)                                             |
+| **Secret**              | Dado sensível (senha, token) gerenciado pelo Swarm: criptografado em trânsito e repouso, montado em /run/secrets/ (Seção 6) |
+| **Self-healing**        | Capacidade do orquestrador de recriar automaticamente réplicas que falham (Seção 3)                                         |
+| **Service**             | Abstração que declara estado desejado de uma aplicação: número de réplicas, imagem, portas, políticas (Seção 3)             |
+| **Service discovery**   | Mecanismo que permite que serviços se encontrem pelo nome em vez de endereço IP (Seção 4)                                   |
+| **Stack**               | Conjunto de serviços relacionados que compõem uma aplicação completa, implantada como unidade (Seção 9)                     |
+| **Stack deploy**        | Comando que implanta uma stack completa no Swarm a partir de um arquivo YAML (Seção 9)                                      |
+| **Worker node**         | Nó do Swarm que executa apenas workloads (containers). Não participa do gerenciamento do cluster (Seção 7)                  |
+
+```
+
 ```

@@ -3,7 +3,20 @@ titulo: "Aula 06: Kubernetes — Introdução à Orquestração em Produção"
 modulo: "Docker — Da Containerização ao Deploy em Produção"
 duracao_estimada: "150 minutos"
 nivel: "intermediario"
-tags: [kubernetes, k8s, orquestracao, minikube, kubectl, pods, deployments, services, configmaps, secrets, declarativo]
+tags:
+  [
+    kubernetes,
+    k8s,
+    orquestracao,
+    minikube,
+    kubectl,
+    pods,
+    deployments,
+    services,
+    configmaps,
+    secrets,
+    declarativo,
+  ]
 data: 2026-06-18
 ---
 
@@ -50,30 +63,29 @@ Ao longo do caminho, você encontrará seções **"Quick Check"** ao final de ca
 
 Este diagrama mostra todos os conceitos que você vai dominar nesta aula:
 
-
 ![Mapa mental: Kubernetes — Introdução à Orquestração em Produção](images/diagrama-01-mindmap.png)
 
 ---
 
 ## Recapitulação das Aulas 01 a 05
 
-| Aula | Conceito | Onde aparece nesta aula | Como se conecta |
-|---|---|---|---|
-| Aula 01 | **Dockerfile multi-stage** (Seções 8-10) | Parte 1, Seções 1-3 | A imagem é o artefato imutável que o orquestrador gerencia e distribui pelo cluster |
-| Aula 01 | **Camadas de imagem e CoW** (Seção 2) | Parte 1, Seção 1 | O reconciliation loop assume imagens imutáveis — cada réplica parte da mesma camada base |
-| Aula 02 | **docker-compose.yml declarativo** (Seções 6-11) | Parte 2 — tradução para manifests | Você já declara infraestrutura em YAML; agora vai declarar no formato do orquestrador de produção |
-| Aula 02 | **Multi-serviço com rede e volumes** (Seções 2, 10) | Parte 2 — aplicação + banco no cluster | A stack multi-serviço do Compose será traduzida para o cluster |
-| Aula 03 | **Registry e tags versionadas** (Seções 7-9) | Parte 2 — image pull policy | O orquestrador puxa imagens do registry; tags imutáveis garantem que o deploy é exatamente o que foi testado |
-| Aula 04 | **Pipeline CI/CD automatizado** (Seções 1-4) | Parte 2 — deploy via pipeline | O pipeline entrega a imagem no registry; o orquestrador a puxa e implanta no cluster |
-| Aula 05 | **Estado desejado com serviços** (Seção 2) | Parte 1, Seção 1 — reconciliation loop | Você declarou `--replicas 3` e o Swarm convergiu — agora o mesmo princípio em escala de produção |
-| Aula 05 | **Manager e worker nodes** (Seção 1) | Parte 1, Seção 2 — control plane e data plane | Você já viu a separação entre nó de gestão e nó de execução; agora vai ver a arquitetura completa |
-| Aula 05 | **Docker stack deploy** (Seção 3) | Parte 2 — kubectl apply | Você aplicava manifests com `docker stack deploy`; agora vai aplicar com o comando equivalente do orquestrador |
+| Aula    | Conceito                                            | Onde aparece nesta aula                       | Como se conecta                                                                                                |
+| ------- | --------------------------------------------------- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Aula 01 | **Dockerfile multi-stage** (Seções 8-10)            | Parte 1, Seções 1-3                           | A imagem é o artefato imutável que o orquestrador gerencia e distribui pelo cluster                            |
+| Aula 01 | **Camadas de imagem e CoW** (Seção 2)               | Parte 1, Seção 1                              | O reconciliation loop assume imagens imutáveis — cada réplica parte da mesma camada base                       |
+| Aula 02 | **docker-compose.yml declarativo** (Seções 6-11)    | Parte 2 — tradução para manifests             | Você já declara infraestrutura em YAML; agora vai declarar no formato do orquestrador de produção              |
+| Aula 02 | **Multi-serviço com rede e volumes** (Seções 2, 10) | Parte 2 — aplicação + banco no cluster        | A stack multi-serviço do Compose será traduzida para o cluster                                                 |
+| Aula 03 | **Registry e tags versionadas** (Seções 7-9)        | Parte 2 — image pull policy                   | O orquestrador puxa imagens do registry; tags imutáveis garantem que o deploy é exatamente o que foi testado   |
+| Aula 04 | **Pipeline CI/CD automatizado** (Seções 1-4)        | Parte 2 — deploy via pipeline                 | O pipeline entrega a imagem no registry; o orquestrador a puxa e implanta no cluster                           |
+| Aula 05 | **Estado desejado com serviços** (Seção 2)          | Parte 1, Seção 1 — reconciliation loop        | Você declarou `--replicas 3` e o Swarm convergiu — agora o mesmo princípio em escala de produção               |
+| Aula 05 | **Manager e worker nodes** (Seção 1)                | Parte 1, Seção 2 — control plane e data plane | Você já viu a separação entre nó de gestão e nó de execução; agora vai ver a arquitetura completa              |
+| Aula 05 | **Docker stack deploy** (Seção 3)                   | Parte 2 — kubectl apply                       | Você aplicava manifests com `docker stack deploy`; agora vai aplicar com o comando equivalente do orquestrador |
 
 ---
 
 **FUNDAMENTOS: Mecanismos Universais de Orquestração Declarativa em Cluster**
 
-> *Os conceitos desta seção são universais — valem para qualquer orquestrador declarativo, independentemente da ferramenta específica. Na segunda parte, você verá como um orquestrador de produção implementa cada um deles.*
+> _Os conceitos desta seção são universais — valem para qualquer orquestrador declarativo, independentemente da ferramenta específica. Na segunda parte, você verá como um orquestrador de produção implementa cada um deles._
 
 ---
 
@@ -93,7 +105,6 @@ Um orquestrador declarativo funciona exatamente assim. Você declara "quero 3 r�
 2. **Compara** com o estado desejado que você declarou no manifesto
 3. **Age** se houver diferença (cria réplicas faltantes, remove excedentes, substitui as que falharam)
 4. **Volta para o passo 1** — o ciclo nunca termina enquanto o cluster existir
-
 
 ![Diagrama: Reconciliation Loop — estado desejado vs estado real](images/diagrama-02-flowchart.png)
 
@@ -149,7 +160,6 @@ O data plane é onde o trabalho acontece. São os nós que executam seus contain
 
 - **Proxy de Rede**: componente que gerencia as regras de rede local, garantindo que o tráfego chegue aos containers corretos e que as políticas de rede sejam aplicadas.
 
-
 ![Diagrama: Arquitetura de Cluster — Control Plane e Data Plane](images/diagrama-03-flowchart.png)
 
 ### O Que Você Já Conhece
@@ -183,14 +193,14 @@ Agora, generalize: em um orquestrador declarativo de produção, **todo recurso 
 
 Nesta arquitetura, absolutamente tudo que você gerencia no cluster é um recurso de API:
 
-| Tipo de Recurso | O que Declara | Exemplo Concreto |
-|---|---|---|
-| **Workload** | Qual imagem rodar, quantas réplicas, portas | "API Express com 3 réplicas na porta 3000" |
-| **Rede** | Como os workloads se comunicam | "Serviço interno na porta 5432 para o banco" |
-| **Armazenamento** | Volumes persistentes | "Volume de 10 GB para PostgreSQL" |
-| **Configuração** | Variáveis de ambiente e arquivos | "URL do banco = db:5432" |
-| **Segredos** | Dados sensíveis criptografados | "Senha do banco de dados" |
-| **Autenticação** | Quem pode fazer o quê | "Usuário X pode ler logs; Y pode fazer deploy" |
+| Tipo de Recurso   | O que Declara                               | Exemplo Concreto                               |
+| ----------------- | ------------------------------------------- | ---------------------------------------------- |
+| **Workload**      | Qual imagem rodar, quantas réplicas, portas | "API Express com 3 réplicas na porta 3000"     |
+| **Rede**          | Como os workloads se comunicam              | "Serviço interno na porta 5432 para o banco"   |
+| **Armazenamento** | Volumes persistentes                        | "Volume de 10 GB para PostgreSQL"              |
+| **Configuração**  | Variáveis de ambiente e arquivos            | "URL do banco = db:5432"                       |
+| **Segredos**      | Dados sensíveis criptografados              | "Senha do banco de dados"                      |
+| **Autenticação**  | Quem pode fazer o quê                       | "Usuário X pode ler logs; Y pode fazer deploy" |
 
 Cada recurso segue o mesmo padrão de manifesto: um YAML com campos de identificação (`apiVersion`, `kind`, `metadata`) e a configuração desejada (`spec`). Você escreve o YAML, submete via API, e o controlador correspondente entra em ação com seu reconciliation loop.
 
@@ -233,7 +243,7 @@ Cada bloco (`api`, `db`) declarava o estado desejado daquele serviço. Agora a m
 
 **APLICAÇÃO: Kubernetes — O Orquestrador Declarativo de Produção**
 
-> *Agora que você entende os mecanismos universais de orquestração declarativa em cluster — estado desejado, reconciliation loop, arquitetura control plane / data plane e recursos como API de infraestrutura — vamos conectá-los ao Kubernetes, o orquestrador que se tornou o padrão da indústria para produção em escala.*
+> _Agora que você entende os mecanismos universais de orquestração declarativa em cluster — estado desejado, reconciliation loop, arquitetura control plane / data plane e recursos como API de infraestrutura — vamos conectá-los ao Kubernetes, o orquestrador que se tornou o padrão da indústria para produção em escala._
 
 ---
 
@@ -265,18 +275,17 @@ Cada nó worker executa **três processos** obrigatórios:
 
 ### Mapeamento Swarm → Kubernetes
 
-| Conceito Swarm | Conceito Kubernetes | Diferença Principal |
-|---|---|---|
-| Manager node | Control Plane | K8s separa em 4 componentes modulares |
-| Worker node | Worker node (kubelet + kube-proxy) | Swarm usa Docker Engine como agent |
-| Service (modo replicado) | Deployment | Deployment gerencia ReplicaSets e rolling updates |
-| Task (container individual) | Pod | Pod pode conter 1+ containers |
-| Service network (VIP) | Service (ClusterIP) | K8s tem múltiplos tipos de Service |
-| Config (docker config create) | ConfigMap | K8s usa labels e selectors para associar |
-| Secret (docker secret create) | Secret | K8s armazena em etcd (base64 por padrão) |
-| Stack (docker stack deploy) | Conjunto de manifests | K8s usa `kubectl apply -f .` em diretório |
-| docker-compose.yml | manifests YAML individuais | Um recurso por arquivo (boa prática) |
-
+| Conceito Swarm                | Conceito Kubernetes                | Diferença Principal                               |
+| ----------------------------- | ---------------------------------- | ------------------------------------------------- |
+| Manager node                  | Control Plane                      | K8s separa em 4 componentes modulares             |
+| Worker node                   | Worker node (kubelet + kube-proxy) | Swarm usa Docker Engine como agent                |
+| Service (modo replicado)      | Deployment                         | Deployment gerencia ReplicaSets e rolling updates |
+| Task (container individual)   | Pod                                | Pod pode conter 1+ containers                     |
+| Service network (VIP)         | Service (ClusterIP)                | K8s tem múltiplos tipos de Service                |
+| Config (docker config create) | ConfigMap                          | K8s usa labels e selectors para associar          |
+| Secret (docker secret create) | Secret                             | K8s armazena em etcd (base64 por padrão)          |
+| Stack (docker stack deploy)   | Conjunto de manifests              | K8s usa `kubectl apply -f .` em diretório         |
+| docker-compose.yml            | manifests YAML individuais         | Um recurso por arquivo (boa prática)              |
 
 ![Diagrama: Arquitetura Kubernetes — Control Plane e Data Plane](images/diagrama-04-flowchart.png)
 
@@ -410,12 +419,12 @@ Na prática, **99% dos Pods têm um único container**. O padrão de múltiplos 
 
 ### Comparação Swarm Task vs K8s Pod
 
-| Característica | Swarm Task | K8s Pod |
-|---|---|---|
-| Unidade mínima | Container | Pod (1+ containers) |
-| IP próprio | Sim, cada container | Sim, cada Pod (compartilhado) |
-| Ciclo de vida | Gerenciado pelo Service | Gerenciado pelo Controller |
-| Rede | Rede overlay do Swarm | Network namespace do Pod + CNI |
+| Característica       | Swarm Task                           | K8s Pod                            |
+| -------------------- | ------------------------------------ | ---------------------------------- |
+| Unidade mínima       | Container                            | Pod (1+ containers)                |
+| IP próprio           | Sim, cada container                  | Sim, cada Pod (compartilhado)      |
+| Ciclo de vida        | Gerenciado pelo Service              | Gerenciado pelo Controller         |
+| Rede                 | Rede overlay do Swarm                | Network namespace do Pod + CNI     |
 | Persistência efêmera | Sim, task morre → container recriado | Sim, Pod morre → novo Pod, novo IP |
 
 ### YAML de um Pod
@@ -506,7 +515,6 @@ No Docker Swarm, você declarava serviços com `docker service create --replicas
 
 ### Hierarquia: Deployment → ReplicaSet → Pod
 
-
 ![Diagrama: Hierarquia Deployment, ReplicaSet e Pod](images/diagrama-05a-flowchart.png)
 
 - **Deployment**: gerencia versões e atualizações. Cada vez que você altera a imagem, o Deployment cria um novo ReplicaSet e faz o rolling update.
@@ -530,8 +538,8 @@ spec:
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      maxSurge: 1        # Pods extras além das 3 réplicas
-      maxUnavailable: 0  # Nenhum Pod pode ficar indisponível
+      maxSurge: 1 # Pods extras além das 3 réplicas
+      maxUnavailable: 0 # Nenhum Pod pode ficar indisponível
   selector:
     matchLabels:
       app: minha-api
@@ -548,20 +556,20 @@ spec:
 ```
 
 **maxSurge** e **maxUnavailable** controlam a velocidade e segurança da atualização:
+
 - `maxSurge: 1` → durante o update, pode haver 1 Pod extra (4 no total)
 - `maxUnavailable: 0` → durante o update, nenhum Pod pode ficar fora do ar
 - O Kubernetes primeiro cria o novo Pod, espera ele ficar Ready, depois derruba um antigo
 
 ### Comparação com Swarm
 
-| Operação | Swarm | K8s |
-|---|---|---|
-| Criar serviço | `docker service create` | `kubectl apply -f deployment.yaml` |
-| Escalar | `docker service scale` | `kubectl scale deployment` ou alterar YAML |
-| Atualizar imagem | `docker service update --image` | Alterar YAML e re-aplicar |
-| Rolling update | `--update-parallelism` | `strategy.rollingUpdate` no YAML |
-| Ver histórico | `docker service inspect` | `kubectl rollout history` |
-
+| Operação         | Swarm                           | K8s                                        |
+| ---------------- | ------------------------------- | ------------------------------------------ |
+| Criar serviço    | `docker service create`         | `kubectl apply -f deployment.yaml`         |
+| Escalar          | `docker service scale`          | `kubectl scale deployment` ou alterar YAML |
+| Atualizar imagem | `docker service update --image` | Alterar YAML e re-aplicar                  |
+| Rolling update   | `--update-parallelism`          | `strategy.rollingUpdate` no YAML           |
+| Ver histórico    | `docker service inspect`        | `kubectl rollout history`                  |
 
 ![Diagrama: Deployment, ReplicaSet e Pods](images/diagrama-05-flowchart.png)
 
@@ -613,12 +621,12 @@ Pods são efêmeros — eles morrem, são recriados, ganham novos IPs. Um Servic
 
 ### Tipos de Service
 
-| Tipo | Acesso | Uso Típico |
-|---|---|---|
-| **ClusterIP** (padrão) | IP interno ao cluster | Comunicação entre serviços (api → db) |
-| **NodePort** | Porta em todos os nós (30000-32767) | Acesso externo para desenvolvimento |
-| **LoadBalancer** | IP público do cloud provider | Produção (AWS ELB, GCP LB, Azure LB) |
-| **ExternalName** | Alias DNS externo | Migração gradual |
+| Tipo                   | Acesso                              | Uso Típico                            |
+| ---------------------- | ----------------------------------- | ------------------------------------- |
+| **ClusterIP** (padrão) | IP interno ao cluster               | Comunicação entre serviços (api → db) |
+| **NodePort**           | Porta em todos os nós (30000-32767) | Acesso externo para desenvolvimento   |
+| **LoadBalancer**       | IP público do cloud provider        | Produção (AWS ELB, GCP LB, Azure LB)  |
+| **ExternalName**       | Alias DNS externo                   | Migração gradual                      |
 
 ### DNS Interno
 
@@ -643,9 +651,9 @@ spec:
   selector:
     app: minha-api
   ports:
-    - port: 80          # Porta do Service
-      targetPort: 3000  # Porta do container
-      nodePort: 30080   # Porta do nó (opcional, se omitido o K8s escolhe)
+    - port: 80 # Porta do Service
+      targetPort: 3000 # Porta do container
+      nodePort: 30080 # Porta do nó (opcional, se omitido o K8s escolhe)
 ```
 
 ```yaml
@@ -662,7 +670,6 @@ spec:
     - port: 5432
       targetPort: 5432
 ```
-
 
 ![Diagrama: Service roteando tráfego para Pods](images/diagrama-06-flowchart.png)
 
@@ -730,8 +737,9 @@ metadata:
   name: api-secret
 type: Opaque
 data:
-  DB_USER: cG9zdGdyZXM=          # "postgres" em base64
-  DB_PASSWORD: cGFzc3dvcmQxMjM=  # "password123" em base64
+  DB_USER: cG9zdGdyZXM= # "postgres" em base64
+  # Substitua pelo base64 da sua senha real
+  DB_PASSWORD: U1VBX1NFTkhBX0FRVUk=
 ```
 
 Para criar secrets de forma mais segura:
@@ -782,13 +790,13 @@ spec:
 
 ### Comparação Swarm × K8s
 
-| Característica | Swarm Config | Swarm Secret | K8s ConfigMap | K8s Secret |
-|---|---|---|---|---|
-| Dados | Não-sensíveis | Sensíveis | Não-sensíveis | Sensíveis |
-| Armazenamento | Raft (manager) | Raft (encriptado) | etcd | etcd (base64) |
-| Criptografia em repouso | Não | Sim (Raft) | Não | Opcional |
-| Montagem como arquivo | Sim | Sim | Sim | Sim |
-| Montagem como env | Não | Sim (--secret) | Sim (envFrom) | Sim (envFrom) |
+| Característica          | Swarm Config   | Swarm Secret      | K8s ConfigMap | K8s Secret    |
+| ----------------------- | -------------- | ----------------- | ------------- | ------------- |
+| Dados                   | Não-sensíveis  | Sensíveis         | Não-sensíveis | Sensíveis     |
+| Armazenamento           | Raft (manager) | Raft (encriptado) | etcd          | etcd (base64) |
+| Criptografia em repouso | Não            | Sim (Raft)        | Não           | Opcional      |
+| Montagem como arquivo   | Sim            | Sim               | Sim           | Sim           |
+| Montagem como env       | Não            | Sim (--secret)    | Sim (envFrom) | Sim (envFrom) |
 
 ### Mão na Massa: ConfigMap + Secret
 
@@ -826,14 +834,14 @@ Agora vamos traduzir o `docker-compose.yml` que você construiu nas Aulas 02-05 
 
 ### Mapeamento Sistemático
 
-| docker-compose.yml | K8s Manifest | Explicação |
-|---|---|---|
-| `services.api` | `api-deployment.yaml` + `api-service.yaml` | Deployment (réplicas, imagem) + Service NodePort (exposição) |
-| `services.db` | `db-deployment.yaml` + `db-service.yaml` + `db-pvc.yaml` | Deployment + Service ClusterIP + PersistentVolumeClaim (dados) |
-| `services.api.environment` | `api-configmap.yaml` + `api-secret.yaml` | ConfigMap (dados não-sensíveis) + Secret (dados sensíveis) |
-| `services.db.volumes` | `persistentvolumeclaim.yaml` | Volume persistente para o banco |
-| `services.db.networks` | `db-service.yaml` (ClusterIP) | Rede interna via Service + DNS |
-| `services.api.depends_on` | Desnecessário | K8s não tem depends_on; a API usa retry + health check |
+| docker-compose.yml         | K8s Manifest                                             | Explicação                                                     |
+| -------------------------- | -------------------------------------------------------- | -------------------------------------------------------------- |
+| `services.api`             | `api-deployment.yaml` + `api-service.yaml`               | Deployment (réplicas, imagem) + Service NodePort (exposição)   |
+| `services.db`              | `db-deployment.yaml` + `db-service.yaml` + `db-pvc.yaml` | Deployment + Service ClusterIP + PersistentVolumeClaim (dados) |
+| `services.api.environment` | `api-configmap.yaml` + `api-secret.yaml`                 | ConfigMap (dados não-sensíveis) + Secret (dados sensíveis)     |
+| `services.db.volumes`      | `persistentvolumeclaim.yaml`                             | Volume persistente para o banco                                |
+| `services.db.networks`     | `db-service.yaml` (ClusterIP)                            | Rede interna via Service + DNS                                 |
+| `services.api.depends_on`  | Desnecessário                                            | K8s não tem depends_on; a API usa retry + health check         |
 
 ### Os 7 Manifests
 
@@ -961,7 +969,7 @@ spec:
             claimName: db-pvc
 ```
 
-> *Nota: em produção, mova `POSTGRES_USER` e `POSTGRES_PASSWORD` para um Secret dedicado ao banco, assim como fizemos com a API. Mantivemos inline aqui para manter o exemplo conciso.*
+> _Nota: em produção, mova `POSTGRES_USER` e `POSTGRES_PASSWORD` para um Secret dedicado ao banco, assim como fizemos com a API. Mantivemos inline aqui para manter o exemplo conciso._
 
 **7. db-service.yaml** (ClusterIP)
 
@@ -978,7 +986,6 @@ spec:
     - port: 5432
       targetPort: 5432
 ```
-
 
 ![Diagrama: Mapeamento docker-compose.yml para manifests Kubernetes](images/diagrama-07-flowchart.png)
 
@@ -1039,11 +1046,11 @@ image: docker.io/zeferino/api-node:1.0.0-build123
 
 ### imagePullPolicy
 
-| Valor | Comportamento |
-|---|---|
-| `Always` | Sempre puxa a imagem do registry |
-| `IfNotPresent` | Só puxa se não estiver em cache no nó |
-| `Never` | Nunca puxa — usa apenas imagens locais |
+| Valor          | Comportamento                          |
+| -------------- | -------------------------------------- |
+| `Always`       | Sempre puxa a imagem do registry       |
+| `IfNotPresent` | Só puxa se não estiver em cache no nó  |
+| `Never`        | Nunca puxa — usa apenas imagens locais |
 
 Para produção com tags imutáveis, use `IfNotPresent`. Para desenvolvimento com `latest`, use `Always`.
 
@@ -1153,6 +1160,7 @@ kubectl patch deployment api-deployment -p \
 ### Fácil
 
 **1. Crie um Pod simples com a imagem nginx.**
+
 ```yaml
 apiVersion: v1
 kind: Pod
@@ -1167,6 +1175,7 @@ spec:
       ports:
         - containerPort: 80
 ```
+
 **Gabarito:** Salve como `nginx-pod.yaml` e execute `kubectl apply -f nginx-pod.yaml`. Verifique com `kubectl get pods`.
 
 **2. Liste os comandos kubectl para: a) ver todos os Pods; b) ver logs de um Pod; c) executar um shell interativo em um Pod.**
@@ -1175,6 +1184,7 @@ spec:
 ### Médio
 
 **3. Traduza o seguinte serviço Compose para manifests K8s (Deployment + Service):**
+
 ```yaml
 services:
   web:
@@ -1183,7 +1193,9 @@ services:
       - "8080:80"
     replicas: 2
 ```
+
 **Gabarito:**
+
 ```yaml
 # web-deployment.yaml
 apiVersion: apps/v1
@@ -1228,6 +1240,7 @@ spec:
 
 **5. Implemente health checks (liveness + readiness) para um Deployment da sua API Express, com endpoint `/health` retornando 200.**
 **Gabarito:**
+
 ```yaml
 apiVersion: apps/v1
 kind: Deployment
@@ -1264,6 +1277,7 @@ spec:
 
 **6. Crie um script que faça deploy completo da stack api + db em K8s, incluindo ConfigMap, Secret, PVC, Deployments e Services, e verifique o status de cada recurso.**
 **Gabarito:**
+
 ```bash
 #!/bin/bash
 # deploy-stack-k8s.sh
@@ -1402,30 +1416,30 @@ Kubernetes é open source (CNCF). Clusters gerenciados em nuvem (EKS, AKS, GKE) 
 
 ## Glossário
 
-| Termo | Definição |
-|---|---|
-| **Cluster** | Conjunto de máquinas (nós) que rodam workloads gerenciados pelo Kubernetes |
-| **Control Plane** | Conjunto de processos que gerenciam o cluster (API Server, etcd, Scheduler, Controller Manager) |
-| **Data Plane** | Nós que executam os containers (kubelet, kube-proxy, container runtime) |
-| **Pod** | Menor unidade de execução no K8s — um ou mais containers com IP e storage compartilhados |
-| **Deployment** | Recurso que gerencia réplicas e rolling updates de Pods |
-| **ReplicaSet** | Controlador que mantém o número exato de Pods rodando |
-| **Service** | Endpoint estável que abstrai um conjunto de Pods |
-| **ClusterIP** | Tipo de Service com IP interno ao cluster |
-| **NodePort** | Tipo de Service que expõe uma porta em todos os nós |
-| **LoadBalancer** | Tipo de Service integrado com load balancer do cloud provider |
-| **ConfigMap** | Recurso para dados de configuração não-sensíveis |
-| **Secret** | Recurso para dados sensíveis (codificados em base64) |
-| **PersistentVolumeClaim (PVC)** | Pedido de armazenamento persistente |
-| **Rolling Update** | Estratégia de atualização gradual sem downtime |
-| **Health Check** | Sonda que verifica se o container está vivo (liveness) ou pronto para receber tráfego (readiness) |
-| **Reconciliation Loop** | Ciclo contínuo de observar, comparar, agir |
-| **Estado Desejado** | Declaração do estado final que o orquestrador deve manter |
-| **kubelet** | Agente do K8s em cada nó worker |
-| **kube-proxy** | Proxy de rede em cada nó |
-| **etcd** | Banco chave-valor distribuído do control plane |
-| **kubectl** | CLI para interagir com o cluster |
-| **minikube** | Cluster K8s de nó único para desenvolvimento local |
-| **Namespace** | Divisão lógica dentro de um cluster |
-| **Contexto** | Combinação de cluster + usuário + namespace no kubeconfig |
-| **Helm** | Gerenciador de pacotes do Kubernetes |
+| Termo                           | Definição                                                                                         |
+| ------------------------------- | ------------------------------------------------------------------------------------------------- |
+| **Cluster**                     | Conjunto de máquinas (nós) que rodam workloads gerenciados pelo Kubernetes                        |
+| **Control Plane**               | Conjunto de processos que gerenciam o cluster (API Server, etcd, Scheduler, Controller Manager)   |
+| **Data Plane**                  | Nós que executam os containers (kubelet, kube-proxy, container runtime)                           |
+| **Pod**                         | Menor unidade de execução no K8s — um ou mais containers com IP e storage compartilhados          |
+| **Deployment**                  | Recurso que gerencia réplicas e rolling updates de Pods                                           |
+| **ReplicaSet**                  | Controlador que mantém o número exato de Pods rodando                                             |
+| **Service**                     | Endpoint estável que abstrai um conjunto de Pods                                                  |
+| **ClusterIP**                   | Tipo de Service com IP interno ao cluster                                                         |
+| **NodePort**                    | Tipo de Service que expõe uma porta em todos os nós                                               |
+| **LoadBalancer**                | Tipo de Service integrado com load balancer do cloud provider                                     |
+| **ConfigMap**                   | Recurso para dados de configuração não-sensíveis                                                  |
+| **Secret**                      | Recurso para dados sensíveis (codificados em base64)                                              |
+| **PersistentVolumeClaim (PVC)** | Pedido de armazenamento persistente                                                               |
+| **Rolling Update**              | Estratégia de atualização gradual sem downtime                                                    |
+| **Health Check**                | Sonda que verifica se o container está vivo (liveness) ou pronto para receber tráfego (readiness) |
+| **Reconciliation Loop**         | Ciclo contínuo de observar, comparar, agir                                                        |
+| **Estado Desejado**             | Declaração do estado final que o orquestrador deve manter                                         |
+| **kubelet**                     | Agente do K8s em cada nó worker                                                                   |
+| **kube-proxy**                  | Proxy de rede em cada nó                                                                          |
+| **etcd**                        | Banco chave-valor distribuído do control plane                                                    |
+| **kubectl**                     | CLI para interagir com o cluster                                                                  |
+| **minikube**                    | Cluster K8s de nó único para desenvolvimento local                                                |
+| **Namespace**                   | Divisão lógica dentro de um cluster                                                               |
+| **Contexto**                    | Combinação de cluster + usuário + namespace no kubeconfig                                         |
+| **Helm**                        | Gerenciador de pacotes do Kubernetes                                                              |

@@ -23,4 +23,5 @@ jobs:
         run: |
           docker run -v ${{ github.workspace }}:/path \
             ghcr.io/gitleaks/gitleaks:latest \
-            detect --source=/path --no-git -v
+            detect --source=/path --no-git -v \
+            --config /path/.gitleaks.toml
