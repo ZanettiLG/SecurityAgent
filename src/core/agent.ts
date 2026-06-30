@@ -500,7 +500,19 @@ export class SecurityAgent {
   private async llmEvaluate(event: SecurityEvent): Promise<void> {
     if (!this.llmClient || !this.memory) return;
     try {
-      const context = await this.memory.getContextForLlm(event);
+      const sceneCtx = event.cameraId
+        ? this.sceneContexts.get(event.cameraId)
+        : undefined;
+      const compiledContext = await this.memory.getContextForLlm(
+        event,
+        sceneCtx,
+      );
+      const context = {
+        compiledContext,
+        sceneContext: sceneCtx,
+        cameraId: event.cameraId,
+        eventType: event.eventType,
+      };
       const assessment = await this.llmClient.evaluate(event, context);
       this.bus.publish(
         "llm.assessment",

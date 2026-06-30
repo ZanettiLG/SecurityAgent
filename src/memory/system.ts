@@ -8,6 +8,7 @@ import {
   type PersonRecord,
   type SecurityEvent,
   type EventType,
+  type SceneContext,
 } from "../core/types.js";
 import { SqliteEventStore } from "./sqlite-event-store.js";
 import { SqlitePersonRegistry } from "./person-store.js";
@@ -18,6 +19,7 @@ import { PersistentKnowledgeGraph } from "./kg-store.js";
 import { RoutineStore } from "./routine-store.js";
 import { HypothesisStore } from "./hypothesis-store.js";
 import { ConversationStore } from "./conversation-store.js";
+import { ContextCompiler } from "./context-compiler.js";
 
 // ── Vector Store ─────────────────────────────────────────────────
 
@@ -150,6 +152,7 @@ export class MemorySystem {
   routineStore: RoutineStore;
   hypothesisStore: HypothesisStore;
   conversationStore: ConversationStore;
+  contextCompiler: ContextCompiler;
 
   constructor(config?: { dataDir?: string; chromaHost?: string }) {
     const dataDir = config?.dataDir ?? "./data";
@@ -170,6 +173,7 @@ export class MemorySystem {
     this.conversationStore = new ConversationStore(
       `${dataDir}/conversations.db`,
     );
+    this.contextCompiler = new ContextCompiler();
 
     this.anomalyDetector = new AnomalyDetector(
       this.eventStore,
@@ -191,24 +195,13 @@ export class MemorySystem {
 
   async getContextForLlm(
     event: SecurityEvent,
-  ): Promise<Record<string, unknown>> {
-    const recent = await this.eventStore.getRecent(10);
-    const persons = await Promise.all(
-      event.personsInvolved.map(async (pid) => ({
-        personId: pid,
-        name: (await this.personRegistry.get(pid))?.name ?? null,
-      })),
-    );
-
-    return {
-      recentEvents: recent.slice(-20).map((e) => ({
-        timestamp: e.timestamp.toISOString(),
-        type: e.eventType,
-        description: e.description,
-        severity: e.severity,
-      })),
-      personsInvolved: persons,
-    };
+    sceneContext?: SceneContext,
+  ): Promise<string> {
+    return this.contextCompiler.compile({
+      event,
+      sceneContext,
+      memory: this,
+    });
   }
 
   async consolidate(): Promise<void> {
