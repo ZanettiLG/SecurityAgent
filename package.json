@@ -39,6 +39,7 @@
     "supertest": "^7.0.0",
     "tsx": "^4.15.0",
     "typescript": "^5.5.0",
+    "typescript-eslint": "^8.62.1",
     "vitest": "^2.0.0"
   },
   "optionalDependencies": {

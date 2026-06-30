@@ -47,6 +47,15 @@ export interface PTZStatus {
 }
 
 export interface OnvifPTZ {
+  /** Connect to the ONVIF camera */
+  connect(): Promise<void>;
+  /** Disconnect from the ONVIF camera */
+  disconnect(): Promise<void>;
+  /** Whether the camera is currently connected */
+  readonly isConnected: boolean;
+  /** Camera ID */
+  readonly cameraId: string;
+
   continuousMove(vector: PTZVector, speed?: PTZSpeed): Promise<void>;
   stopMove(panTilt?: boolean, zoom?: boolean): Promise<void>;
   absoluteMove(position: PTZVector, speed?: PTZSpeed): Promise<void>;
@@ -123,10 +132,9 @@ export class OnvifConnector implements CameraConnector, OnvifPTZ {
     if (this.username && this.password) {
       const basicAuth = `Basic ${Buffer.from(`${this.username}:${this.password}`).toString("base64")}`;
       const origRequest = cam._requestPart2.bind(cam);
-      cam._requestPart2 = function (
-        options: Record<string, unknown>,
-        callback: (err?: Error | null) => void,
-      ): void {
+      cam._requestPart2 = function (this: onvif.Cam, ...args: unknown[]): void {
+        const options = args[0] as Record<string, unknown>;
+        const callback = args[1] as (err?: Error | null) => void;
         const headers =
           (options.headers as Record<string, string> | undefined) ?? {};
         headers.Authorization = basicAuth;
@@ -159,10 +167,10 @@ export class OnvifConnector implements CameraConnector, OnvifPTZ {
           }
           // Set activeSource for PTZ operations (first media profile)
           const profiles = cam.profiles as unknown as
-            | Array<{ $: { token: string } }>
-            | undefined;
+            Array<{ $: { token: string } }> | undefined;
           if (profiles && profiles.length > 0 && profiles[0]?.$.token) {
-            (cam as Record<string, unknown>).activeSource = {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (cam as any).activeSource = {
               profileToken: profiles[0].$.token,
             };
           } else {
@@ -173,7 +181,8 @@ export class OnvifConnector implements CameraConnector, OnvifPTZ {
               { cameraId: this.cameraId },
               "No ONVIF profiles found — using dummy profile token",
             );
-            (cam as Record<string, unknown>).activeSource = {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (cam as any).activeSource = {
               profileToken: "profile_1",
             };
           }
@@ -293,27 +302,25 @@ export class OnvifConnector implements CameraConnector, OnvifPTZ {
   async listPresets(): Promise<PresetInfo[]> {
     const cam = this.ensureCam();
     return new Promise<PresetInfo[]>((resolve, reject) => {
-      cam.getPresets(
-        {},
-        (
-          err: Error | null,
-          presets: Record<string, { $: { token: string }; Name?: string[] }>,
-        ) => {
-          if (err) {
-            reject(err);
-          } else {
-            const list: PresetInfo[] = Object.values(presets ?? {}).map(
-              (p) => ({
-                token: p.$?.token ?? "",
-                name: Array.isArray(p.Name)
-                  ? (p.Name[0] ?? "")
-                  : ((p.Name as unknown as string) ?? ""),
-              }),
-            );
-            resolve(list);
-          }
-        },
-      );
+      cam.getPresets({}, (err: Error | null, presets?: unknown) => {
+        if (err) {
+          reject(err);
+        } else {
+          const list: PresetInfo[] = Object.values(presets ?? {}).map((p) => {
+            const pVal = p as {
+              $?: { token?: string };
+              Name?: string[] | string;
+            };
+            return {
+              token: pVal.$?.token ?? "",
+              name: Array.isArray(pVal.Name)
+                ? (pVal.Name[0] ?? "")
+                : ((pVal.Name as string) ?? ""),
+            };
+          });
+          resolve(list);
+        }
+      });
     });
   }
 
@@ -344,7 +351,7 @@ export class OnvifConnector implements CameraConnector, OnvifPTZ {
       }
       cam.setPreset(
         opts,
-        (err: Error | null, result: Record<string, unknown> | undefined) => {
+        (err: Error | null, result?: Record<string, unknown>) => {
           if (err) reject(err);
           else {
             const newToken =
@@ -394,10 +401,13 @@ export class OnvifConnector implements CameraConnector, OnvifPTZ {
   async getStatus(): Promise<PTZStatus> {
     const cam = this.ensureCam();
     return new Promise<PTZStatus>((resolve, reject) => {
-      cam.getStatus({}, (err: Error | null, status: PTZStatus) => {
-        if (err) reject(err);
-        else resolve(status);
-      });
+      cam.getStatus(
+        {},
+        (err: Error | null, status?: Record<string, unknown>) => {
+          if (err) reject(err);
+          else resolve(status as unknown as PTZStatus);
+        },
+      );
     });
   }
 

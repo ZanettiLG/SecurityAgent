@@ -6,7 +6,12 @@
  * presets, and home position. No HTTP dependency.
  */
 
-import type { OnvifPTZ, PresetInfo } from "../../perception/onvif-connector.js";
+import type {
+  OnvifPTZ,
+  PresetInfo,
+  PTZSpeed,
+  PTZStatus,
+} from "../../perception/onvif-connector.js";
 import { logger } from "../../core/logger.js";
 
 export class CameraNotFoundError extends Error {

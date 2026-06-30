@@ -48,8 +48,13 @@ export async function createApiApp(): Promise<Express> {
       try {
         const mod: RouteModule = await import(routePath);
         const prefix = mod.path ?? derivePrefix(file);
-        app.use(prefix, mod.router ?? mod.default);
-        logger.info({ prefix, file }, "Route mounted");
+        const handler = mod.router ?? mod.default;
+        if (handler) {
+          app.use(prefix, handler);
+          logger.info({ prefix, file }, "Route mounted");
+        } else {
+          logger.warn({ file }, "Route file has no exported router");
+        }
         return { file, prefix, ok: true };
       } catch (err) {
         logger.error({ err, file }, "Failed to mount route");

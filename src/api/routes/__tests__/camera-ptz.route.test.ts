@@ -19,8 +19,12 @@ import type {
 
 // ── Mock OnvifPTZ ──────────────────────────────────────────────
 
-function createMockPTZ(): OnvifPTZ {
+function createMockPTZ(id: string = "mock-cam"): OnvifPTZ {
   return {
+    cameraId: id,
+    isConnected: true,
+    connect: vi.fn().mockResolvedValue(undefined),
+    disconnect: vi.fn().mockResolvedValue(undefined),
     continuousMove: vi.fn().mockResolvedValue(undefined),
     stopMove: vi.fn().mockResolvedValue(undefined),
     absoluteMove: vi.fn().mockResolvedValue(undefined),

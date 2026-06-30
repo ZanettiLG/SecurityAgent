@@ -204,10 +204,8 @@ describe("OnvifConnector", () => {
       await connector.connect();
       const presets = await connector.listPresets();
       expect(presets).toHaveLength(2);
-      if (presets.length >= 2) {
-        expect(presets[0].name).toBe("Home");
-        expect(presets[1].token).toBe("preset2");
-      }
+      expect(presets[0]?.name).toBe("Home");
+      expect(presets[1]?.token).toBe("preset2");
     });
 
     it("deve ir para um preset", async () => {

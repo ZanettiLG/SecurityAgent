@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   lint:
-    name: Lint (all workspaces)
+    name: Lint
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -21,7 +21,7 @@ jobs:
       - run: npm run lint
 
   typecheck:
-    name: TypeCheck (all workspaces)
+    name: TypeCheck
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -31,8 +31,6 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Generate Prisma client
-        run: cd backend && npx prisma generate
       - run: npm run typecheck
 
   test-backend:
@@ -46,36 +44,16 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Generate Prisma client
-        run: cd backend && npx prisma generate
-      - name: Run Prisma migrations (SQLite)
-        run: cd backend && npx prisma migrate deploy
-      - name: Run backend tests with coverage
-        run: cd backend && npx vitest run --coverage
-      - name: Check coverage threshold
-        run: |
-          COVERAGE=$(node -e "
-            const fs = require('fs');
-            const lcov = fs.readFileSync('backend/coverage/lcov.info', 'utf8');
-            const lines = lcov.match(/^LF:(\d+)/gm) || [];
-            const hits = lcov.match(/^LH:(\d+)/gm) || [];
-            const totalLines = lines.reduce((s,l) => s + parseInt(l.replace('LF:','')), 0);
-            const totalHits = hits.reduce((s,l) => s + parseInt(l.replace('LH:','')), 0);
-            const pct = totalLines > 0 ? (totalHits / totalLines * 100).toFixed(1) : 0;
-            console.log(pct);
-          ")
-          echo "Backend coverage: ${COVERAGE}%"
-          if (( $(echo "$COVERAGE < 80" | bc -l) )); then
-            echo "::error::Coverage ${COVERAGE}% is below 80% threshold"
-            exit 1
-          fi
+      - name: Run backend tests
+        run: npx vitest run --reporter=verbose
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: coverage-backend
-          path: backend/coverage/
+          name: test-results
+          path: test-results/
 
   test-frontend:
-    name: Test Frontend
+    name: Test Frontend (Dashboard)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -85,52 +63,15 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Run frontend tests
-        run: cd frontend && npx vitest run
-      - uses: actions/upload-artifact@v4
-        with:
-          name: test-results-frontend
-          path: frontend/test-results/
+      - name: Install dashboard dependencies
+        run: cd dashboard && npm ci
+      - name: Build check dashboard
+        run: cd dashboard && npm run build
 
-  test-e2e:
-    name: Test E2E (Playwright)
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    env:
-      MINIO_ENDPOINT: localhost
-      MINIO_PORT: '9000'
-      MINIO_ACCESS_KEY: audiobooker
-      MINIO_SECRET_KEY: audiobooker-secret-change-me
-      TTS_PROVIDER: edge
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - name: Start MinIO (required by backend)
-        run: docker compose up -d minio && sleep 3
-      - name: Generate Prisma client
-        run: cd backend && npx prisma generate
-      - name: Install Playwright browsers
-        run: npx playwright install chromium --with-deps
-      - name: Run E2E tests
-        run: npx playwright test --config playwright.config.ts
-      - name: Stop MinIO
-        if: always()
-        run: docker compose down
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: playwright-report
-          path: playwright-report/
-
-  validate-architecture:
-    name: Validate Architecture (dependency-cruiser)
+  lint-dashboard:
+    name: Lint Dashboard
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [lint, typecheck]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
@@ -138,7 +79,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Install dependency-cruiser
-        run: npm install --no-save dependency-cruiser
-      - name: Validate architecture rules
-        run: npx depcruise --validate .dependency-cruiser.cjs backend/src/ frontend/app/ frontend/components/ frontend/services/ frontend/stores/ frontend/lib/ frontend/hooks/ frontend/types/
+      - name: Lint dashboard
+        run: cd dashboard && npm run lint

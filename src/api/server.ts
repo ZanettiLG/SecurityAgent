@@ -36,7 +36,7 @@ export async function createDashboardServer(
     // Connect all ONVIF cameras (best-effort, non-blocking)
     for (const [id, cam] of ptzCameras) {
       if (!cam.isConnected) {
-        cam.connect().catch((err) => {
+        cam.connect().catch((err: Error) => {
           logger.warn(
             { err, cameraId: id },
             "ONVIF connection failed — PTZ may not work",

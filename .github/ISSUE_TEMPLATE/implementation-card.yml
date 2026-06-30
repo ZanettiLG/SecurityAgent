@@ -65,5 +65,5 @@ body:
         - label: All tasks complete
         - label: Tests passing (baseline preserved)
         - label: Lint 0 + typecheck 0
-        - label: Code review: 0 critical
+        - label: "Code review: 0 critical"
         - label: PR linked

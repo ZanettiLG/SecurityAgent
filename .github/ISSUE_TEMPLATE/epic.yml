@@ -266,7 +266,7 @@ body:
       label: Definition of Done for Implementation
       options:
         - label: All tasks completed
-        - label: Tests passing (baseline: 330 backend + 2 frontend)
+        - label: "Tests passing (baseline: 330 backend + 2 frontend)"
         - label: Lint 0 warnings + typecheck 0 errors
         - label: Code review passed (0 critical issues)
         - label: PR created with all tasks checked
@@ -353,10 +353,10 @@ body:
       label: Final Checklist
       options:
         - label: All tasks complete
-        - label: Tests passing (baseline preserved: 330 backend + 2 frontend)
-        - label: Lint: 0 warnings
-        - label: Typecheck: 0 errors
-        - label: Code review: 0 critical issues
+        - label: "Tests passing (baseline preserved: 330 backend + 2 frontend)"
+        - label: "Lint: 0 warnings"
+        - label: "Typecheck: 0 errors"
+        - label: "Code review: 0 critical issues"
         - label: PR created and linked
 
   - type: markdown
