@@ -19,7 +19,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@v3
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Run Gitleaks (Docker)
+        run: |
+          docker run -v ${{ github.workspace }}:/path \
+            ghcr.io/gitleaks/gitleaks:latest \
+            detect --source=/path --no-git -v

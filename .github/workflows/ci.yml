@@ -79,5 +79,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Install dashboard dependencies
+        run: cd dashboard && npm ci
       - name: Lint dashboard
         run: cd dashboard && npm run lint
