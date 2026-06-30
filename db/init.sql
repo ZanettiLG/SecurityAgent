@@ -81,3 +81,89 @@ CREATE TABLE IF NOT EXISTS config_changes (
     new_value JSONB,
     changed_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Knowledge Graph (Issue #1 — Memória Persistente)
+CREATE TABLE IF NOT EXISTS kg_nodes (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL,
+    label TEXT NOT NULL,
+    properties TEXT DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS kg_edges (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    from_node TEXT NOT NULL,
+    to_node TEXT NOT NULL,
+    type TEXT NOT NULL,
+    properties TEXT DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (from_node) REFERENCES kg_nodes(id),
+    FOREIGN KEY (to_node) REFERENCES kg_nodes(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_kg_edges_from ON kg_edges(from_node);
+CREATE INDEX IF NOT EXISTS idx_kg_edges_to ON kg_edges(to_node);
+CREATE INDEX IF NOT EXISTS idx_kg_edges_type ON kg_edges(type);
+
+-- Routine Profiles (Issue #1)
+CREATE TABLE IF NOT EXISTS routine_profiles (
+    entity_id TEXT PRIMARY KEY,
+    entity_type TEXT NOT NULL,
+    hourly_activity TEXT NOT NULL DEFAULT '[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]',
+    daily_activity TEXT NOT NULL DEFAULT '[0,0,0,0,0,0,0]',
+    typical_events TEXT DEFAULT '{}',
+    total_observations INTEGER DEFAULT 0,
+    days_of_data INTEGER DEFAULT 0,
+    last_updated TEXT
+);
+
+-- Scene Contexts (Issue #1)
+CREATE TABLE IF NOT EXISTS scene_contexts (
+    camera_id TEXT PRIMARY KEY,
+    label TEXT,
+    description TEXT DEFAULT '',
+    location TEXT NOT NULL DEFAULT 'EXTERNAL',
+    environment TEXT DEFAULT '{}',
+    known_residents TEXT DEFAULT '[]',
+    known_vehicles TEXT DEFAULT '[]',
+    zones TEXT DEFAULT '[]',
+    routines TEXT DEFAULT '[]',
+    last_updated TEXT NOT NULL,
+    version INTEGER DEFAULT 1
+);
+
+-- Hypotheses (Issue #1)
+CREATE TABLE IF NOT EXISTS hypotheses (
+    hypothesis_id TEXT PRIMARY KEY,
+    title TEXT NOT NULL DEFAULT '',
+    description TEXT DEFAULT '',
+    probability REAL DEFAULT 0.5,
+    status TEXT NOT NULL DEFAULT 'draft',
+    supporting_evidence TEXT DEFAULT '[]',
+    contradicting_evidence TEXT DEFAULT '[]',
+    related_entities TEXT DEFAULT '[]',
+    created_at TEXT NOT NULL,
+    tested_at TEXT,
+    resolved_at TEXT,
+    user_feedback TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_hypotheses_status ON hypotheses(status);
+CREATE INDEX IF NOT EXISTS idx_hypotheses_created ON hypotheses(created_at);
+
+-- Conversation History (Issue #1)
+CREATE TABLE IF NOT EXISTS conversation_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    question_id TEXT NOT NULL,
+    text TEXT NOT NULL,
+    answer TEXT NOT NULL,
+    asked_at TEXT NOT NULL,
+    answered_at TEXT,
+    priority TEXT DEFAULT 'medium',
+    related_entities TEXT DEFAULT '[]',
+    related_event_id TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_conv_ts ON conversation_history(asked_at DESC);

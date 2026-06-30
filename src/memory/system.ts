@@ -14,6 +14,10 @@ import { SqlitePersonRegistry } from "./person-store.js";
 import { ChromaVectorStore } from "./chroma-vector-store.js";
 import { KnowledgeGraph } from "./knowledge-graph.js";
 import { SceneContextStore } from "./scene-context-store.js";
+import { PersistentKnowledgeGraph } from "./kg-store.js";
+import { RoutineStore } from "./routine-store.js";
+import { HypothesisStore } from "./hypothesis-store.js";
+import { ConversationStore } from "./conversation-store.js";
 
 // ── Vector Store ─────────────────────────────────────────────────
 
@@ -141,8 +145,11 @@ export class MemorySystem {
   eventStore: SqliteEventStore;
   personRegistry: SqlitePersonRegistry;
   anomalyDetector: AnomalyDetector;
-  knowledgeGraph: KnowledgeGraph;
+  knowledgeGraph: PersistentKnowledgeGraph;
   sceneContextStore: SceneContextStore;
+  routineStore: RoutineStore;
+  hypothesisStore: HypothesisStore;
+  conversationStore: ConversationStore;
 
   constructor(config?: { dataDir?: string; chromaHost?: string }) {
     const dataDir = config?.dataDir ?? "./data";
@@ -152,9 +159,16 @@ export class MemorySystem {
     const chromaVs = new ChromaVectorStore(config?.chromaHost);
     this.vectorStore = chromaVs;
 
-    this.knowledgeGraph = new KnowledgeGraph();
+    this.knowledgeGraph = new PersistentKnowledgeGraph(
+      `${dataDir}/knowledge-graph.db`,
+    );
     this.sceneContextStore = new SceneContextStore(
       `${dataDir}/scene-contexts.db`,
+    );
+    this.routineStore = new RoutineStore(`${dataDir}/routines.db`);
+    this.hypothesisStore = new HypothesisStore(`${dataDir}/hypotheses.db`);
+    this.conversationStore = new ConversationStore(
+      `${dataDir}/conversations.db`,
     );
 
     this.anomalyDetector = new AnomalyDetector(
@@ -167,7 +181,8 @@ export class MemorySystem {
     if (this.vectorStore instanceof ChromaVectorStore) {
       await this.vectorStore.initialize();
     }
-    logger.info("Memory system initialized with persistence");
+    await this.knowledgeGraph.load();
+    logger.info("Memory system initialized with full persistence");
   }
 
   async store(event: SecurityEvent): Promise<void> {

@@ -155,11 +155,10 @@ export class SecurityAgent {
     this.hypothesisEngine = new HypothesisEngine(this.llmClient, this.memory);
     this.behaviorMatcher = new BehavioralPatternMatcher();
     this.queryManager = new QueryManager(this.bus);
-    this.knowledgeGraph = new KnowledgeGraph();
     this.socialInvestigator = new SocialMediaInvestigator();
     this.socialPredictor = new SocialPredictionEngine(
       this.memory,
-      this.knowledgeGraph,
+      this.memory.knowledgeGraph,
     );
     this.retrospectiveAnalyzer = new RetrospectiveAnalyzer(
       this.memory,
