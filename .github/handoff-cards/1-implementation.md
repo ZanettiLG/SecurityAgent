@@ -96,14 +96,14 @@ data/
 
 ### ⚪ Low (nice to have)
 
-| #   | Issue                                                             | Arquivo              | Status                                                                          |
-| --- | ----------------------------------------------------------------- | -------------------- | ------------------------------------------------------------------------------- |
-| 1   | `routine_learner.ts` usa snake_case vs kebab-case                 | `routine_learner.ts` | Aberto (renomear quebraria imports)                                             |
-| 2   | `RoutineStore` vs `PersistentKnowledgeGraph` — nome inconsistente | `routine-store.ts`   | ✅ **Resolvido** — `RoutineStore` → `PersistentRoutineStore` (commit `0cafc75`) |
+| #   | Issue                                                             | Arquivo              | Status                                                                                        |
+| --- | ----------------------------------------------------------------- | -------------------- | --------------------------------------------------------------------------------------------- |
+| 1   | `routine_learner.ts` usa snake_case vs kebab-case                 | `routine_learner.ts` | ✅ **Resolvido** — `routine_learner.ts` → `routine-learner.ts` + 3 imports (commit `ff02e5c`) |
+| 2   | `RoutineStore` vs `PersistentKnowledgeGraph` — nome inconsistente | `routine-store.ts`   | ✅ **Resolvido** — `RoutineStore` → `PersistentRoutineStore` (commit `0cafc75`)               |
 
 ## Summary
 
-🔴 0 critical, 🟡 2 resolved, 🔵 4 resolved, ⚪ 1 resolved, ⚪ 1 aberto.
+🔴 0 critical, 🟡 2 resolved, 🔵 4 resolved, ⚪ 2 resolved.
 
 **Overall:** Implementação sólida — todos os 🟡 resolvidos com commit `65c3485`. A maior lacuna restante são os **testes unitários** para os novos stores (🔵 #4).
 
