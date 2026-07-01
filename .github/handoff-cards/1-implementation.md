@@ -69,3 +69,40 @@ data/
 **You receive:** Implementation Card with all files changed, architecture, verification results
 **You DO NOT receive:** Planning rationale, research notes, conversation history
 **Your job:** Review code changes against SecurityAgent conventions — ESM `.js` imports, strict TypeScript, SQLite WAL mode, DI via MemorySystem facade.
+
+---
+
+## 📋 Code Review Summary
+
+### 🔴 Critical (must fix before merge)
+
+**Nenhum encontrado.** Typecheck (0 errors), lint (0 errors), testes 29/29 passam.
+
+### 🟡 High — Resolvidos ✅
+
+| #   | Issue                                                                                                                                            | Arquivos                                             | Fix                                                                                                                                                                                    |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **Duplicação**: `enrichEventWithContext()` (agent.ts) e `extractRelationships()` (consolidation.ts) criavam arestas KG com lógica quase idêntica | `agent.ts`, `consolidation.ts`, `knowledge-graph.ts` | Movido para `KnowledgeGraph.ensureEdgesForEvent()` — método único chamado pelo consolidation engine. Agent.ts mantém apenas enriquecimento de contexto (queries KG). Commit: `65c3485` |
+| 2   | **Arquitetura**: `(this as unknown as { edges }).edges.push(edge)` em `kg-store.ts` quebrava encapsulamento                                      | `knowledge-graph.ts`, `kg-store.ts`                  | Adicionado `protected _pushEdge(edge)` no `KnowledgeGraph`; `PersistentKnowledgeGraph.load()` usa `super._pushEdge()`. Commit: `65c3485`                                               |
+
+### 🔵 Medium (consider fixing)
+
+| #   | Issue                                                              | Arquivo               | Status |
+| --- | ------------------------------------------------------------------ | --------------------- | ------ |
+| 1   | Parâmetro `depth` em `getFullContext()` nunca usado                | `knowledge-graph.ts`  | Aberto |
+| 2   | `buildRoutineBlock()` nunca chamado em `ContextCompiler.compile()` | `context-compiler.ts` | Aberto |
+| 3   | `import { KnowledgeGraph }` obsoleto em agent.ts                   | `agent.ts:54`         | Aberto |
+| 4   | Nenhum teste unitário para os 7 novos stores                       | Vários                | Aberto |
+
+### ⚪ Low (nice to have)
+
+| #   | Issue                                               | Arquivo              |
+| --- | --------------------------------------------------- | -------------------- |
+| 1   | `routine_learner.ts` usa snake_case vs kebab-case   | `routine_learner.ts` |
+| 2   | `RoutineStore` poderia ser `PersistentRoutineStore` | `routine-store.ts`   |
+
+## Summary
+
+🔴 0 critical, 🟡 2 resolved, 🔵 4 open, ⚪ 2 open.
+
+**Overall:** Implementação sólida — todos os 🟡 resolvidos com commit `65c3485`. A maior lacuna restante são os **testes unitários** para os novos stores (🔵 #4).
