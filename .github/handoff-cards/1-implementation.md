@@ -123,3 +123,24 @@ data/
 1. `code-reviewer.agent.md` — **removido o bloco `handoffs:` inteiro.** Code-reviewer agora é READ-ONLY: documenta findings, não delega. Quebra o loop.
 2. `main.agent.md` — prompts atualizados para `<issue-number>` e adicionado handoff `Pipeline Finalizada` (send: false) para sinalizar término sem delegar.
 3. Comentário `⚠️ NO handoffs block` adicionado para prevenir regressão.
+
+---
+
+## ✅ Integration Gaps Resolved (commit `09b7165`)
+
+| #   | Task                                                     | Files Changed         | Status |
+| --- | -------------------------------------------------------- | --------------------- | ------ |
+| 1   | `sceneContext` na `CameraConnector`                      | `camera-connector.ts` | ✅     |
+| 2   | `RoutineStore` → `RoutineLearner` (write-through save)   | `routine_learner.ts`  | ✅     |
+| 3   | `HypothesisStore` → `HypothesisEngine` (persist + load)  | `hypothesis.ts`       | ✅     |
+| 4   | `ConversationStore` → `QueryManager` (persist on answer) | `query_user.ts`       | ✅     |
+| 5   | Wire all stores into `agent.ts` setup                    | `agent.ts`            | ✅     |
+
+### Previously: 🔵 #4 "Nenhum teste unitário para os 7 novos stores" → **Ainda aberto**
+
+## Final Verification
+
+- [x] `tsc --noEmit` — pass (0 errors)
+- [x] `npm test` — 29/29 pass
+- [x] Planning card: `.github/handoff-cards/1-planning.md`
+- [x] 6 files changed, 198 insertions, 34 deletions
