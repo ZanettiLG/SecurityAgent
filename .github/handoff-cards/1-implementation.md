@@ -106,3 +106,20 @@ data/
 🔴 0 critical, 🟡 2 resolved, 🔵 4 open, ⚪ 2 open.
 
 **Overall:** Implementação sólida — todos os 🟡 resolvidos com commit `65c3485`. A maior lacuna restante são os **testes unitários** para os novos stores (🔵 #4).
+
+---
+
+## 🔧 Harness Fix (Loop Prevention)
+
+**Problema:** O `code-reviewer.agent.md` tinha um handoff incondicional `Fix Issues → task-coder` que sempre enviava para o coder mesmo quando não havia issues, criando um loop infinito: _review → fix → review → fix → ..._
+
+**Causa raiz:**
+
+- `code-reviewer.agent.md` — handoff `Fix Issues` sem condição, enviava para `task-coder` mesmo com 0 issues
+- `main.agent.md` — prompts usavam `<slug>` enquanto os arquivos seguem `<issue-number>` (ex: `1-implementation.md`)
+
+**Fix (commit `830b6cf`):**
+
+1. `code-reviewer.agent.md` — **removido o bloco `handoffs:` inteiro.** Code-reviewer agora é READ-ONLY: documenta findings, não delega. Quebra o loop.
+2. `main.agent.md` — prompts atualizados para `<issue-number>` e adicionado handoff `Pipeline Finalizada` (send: false) para sinalizar término sem delegar.
+3. Comentário `⚠️ NO handoffs block` adicionado para prevenir regressão.
