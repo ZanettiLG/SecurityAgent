@@ -372,47 +372,9 @@ export class SecurityAgent {
       }
     }
 
-    // Create KG edges: persons involved → SEEN_AT → camera
-    if (event.cameraId) {
-      for (const pid of event.personsInvolved) {
-        // Only link if not already linked
-        const existing = this.memory.knowledgeGraph.getEdges(pid);
-        const hasEdge = existing.some(
-          (e) =>
-            e.to === `camera:${event.cameraId}` ||
-            e.from === `camera:${event.cameraId}`,
-        );
-        if (!hasEdge) {
-          this.memory.knowledgeGraph.addEdge(
-            pid,
-            `camera:${event.cameraId}`,
-            "SEEN_AT",
-            {
-              timestamp: event.timestamp.toISOString(),
-              cameraId: event.cameraId,
-            },
-          );
-        }
-      }
-    }
-
-    // Associate persons with vehicles if both present
-    if (vehicleId) {
-      for (const pid of event.personsInvolved) {
-        const vehicles = this.memory.knowledgeGraph.getVehiclesForPerson(pid);
-        if (!vehicles.includes(vehicleId)) {
-          this.memory.knowledgeGraph.addEdge(
-            pid,
-            vehicleId,
-            "ASSOCIATED_WITH",
-            {
-              confidence: 0.5,
-              firstSeen: event.timestamp.toISOString(),
-            },
-          );
-        }
-      }
-    }
+    // Edge creation moved to KnowledgeGraph.ensureEdgesForEvent()
+    // called by ConsolidationEngine.extractRelationships() to avoid
+    // duplicating logic in the hot path.
   }
 
   private async learnRoutine(event: SecurityEvent): Promise<void> {
@@ -540,8 +502,10 @@ export class SecurityAgent {
   ): Promise<void> {
     if (!this.hypothesisEngine || !this.memory) return;
     try {
-      const context = await this.memory.getContextForLlm(event);
-      await this.hypothesisEngine.generateFromEvent(event, context);
+      const contextStr = await this.memory.getContextForLlm(event);
+      await this.hypothesisEngine.generateFromEvent(event, {
+        compiledContext: contextStr,
+      });
     } catch (err) {
       logger.error(
         { err, eventId: event.eventId },
@@ -586,8 +550,10 @@ export class SecurityAgent {
       const recent = await this.memory.eventStore.getRecent(60);
       const anomalous = recent.filter((e) => e.anomalyScore > 0.5);
       for (const event of anomalous.slice(0, 3)) {
-        const context = await this.memory.getContextForLlm(event);
-        void this.hypothesisEngine.generateFromEvent(event, context);
+        const contextStr = await this.memory.getContextForLlm(event);
+        void this.hypothesisEngine.generateFromEvent(event, {
+          compiledContext: contextStr,
+        });
       }
     }
 

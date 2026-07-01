@@ -7,6 +7,7 @@
  */
 
 import { logger } from "../core/logger.js";
+import type { SecurityEvent } from "../core/types.js";
 
 // ── Type Definitions ────────────────────────────────────────────
 
@@ -97,6 +98,83 @@ export class KnowledgeGraph {
     };
 
     this.edges.push(edge);
+  }
+
+  /**
+   * Protected helper for subclasses (e.g., PersistentKnowledgeGraph)
+   * to push edges directly without triggering write-through.
+   * Used when restoring state from SQLite on load().
+   */
+  protected _pushEdge(edge: GraphEdge): void {
+    this.edges.push(edge);
+  }
+
+  /**
+   * Ensure KG edges exist for a SecurityEvent:
+   * - Person → SEEN_AT → Camera
+   * - Person ↔ ASSOCIATED_WITH → Vehicle
+   * Skips if edge already exists (idempotent).
+   */
+  ensureEdgesForEvent(event: SecurityEvent): void {
+    if (event.cameraId) {
+      const cameraNodeId = `camera:${event.cameraId}`;
+      if (!this.getNode(cameraNodeId)) {
+        this.addNode({
+          id: cameraNodeId,
+          type: "CAMERA",
+          label: event.cameraId,
+          properties: { cameraId: event.cameraId },
+        });
+      }
+      for (const pid of event.personsInvolved) {
+        const existing = this.getEdges(pid);
+        const hasSeen = existing.some(
+          (e) => e.to === cameraNodeId || e.from === cameraNodeId,
+        );
+        if (!hasSeen) {
+          this.addEdge(pid, cameraNodeId, "SEEN_AT", {
+            timestamp: event.timestamp.toISOString(),
+            cameraId: event.cameraId,
+          });
+        }
+      }
+    }
+
+    const vehicleId = event.payload.vehicleId as string | undefined;
+    if (vehicleId) {
+      if (!this.getNode(vehicleId)) {
+        this.addNode({
+          id: vehicleId,
+          type: "VEHICLE",
+          label: (event.payload.vehicleDescription as string) ?? vehicleId,
+          properties: {
+            firstSeen: event.timestamp.toISOString(),
+            source: event.cameraId,
+          },
+        });
+      }
+      for (const pid of event.personsInvolved) {
+        const vehicles = this.getVehiclesForPerson(pid);
+        if (!vehicles.includes(vehicleId)) {
+          this.addEdge(pid, vehicleId, "ASSOCIATED_WITH", {
+            confidence: 0.5,
+            firstSeen: event.timestamp.toISOString(),
+          });
+        }
+      }
+    }
+
+    // Ensure person nodes exist
+    for (const pid of event.personsInvolved) {
+      if (!this.getNode(pid)) {
+        this.addNode({
+          id: pid,
+          type: "PERSON",
+          label: pid,
+          properties: { firstSeen: event.timestamp.toISOString() },
+        });
+      }
+    }
   }
 
   getEdges(nodeId: string, edgeType?: EdgeType): GraphEdge[] {

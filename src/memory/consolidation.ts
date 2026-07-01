@@ -151,95 +151,26 @@ export class ConsolidationEngine {
     const facts: ConsolidationResult["newFacts"] = [];
 
     for (const event of events) {
-      const vehicleId = event.payload.vehicleId as string | undefined;
+      // Use centralized method from KnowledgeGraph (no duplication)
+      this.memory.knowledgeGraph.ensureEdgesForEvent(event);
 
-      // Ensure camera node exists in KG
+      // Log facts about created relationships
+      const vehicleId = event.payload.vehicleId as string | undefined;
       if (event.cameraId) {
-        const cameraNodeId = `camera:${event.cameraId}`;
-        if (!this.memory.knowledgeGraph.getNode(cameraNodeId)) {
-          this.memory.knowledgeGraph.addNode({
-            id: cameraNodeId,
-            type: "CAMERA",
-            label: event.cameraId,
-            properties: { cameraId: event.cameraId },
+        for (const pid of event.personsInvolved) {
+          facts.push({
+            type: "relationship",
+            description: `Pessoa ${pid} vista na câmera ${event.cameraId}`,
+            entities: [pid, event.cameraId],
           });
         }
       }
-
-      // Person → SEEN_AT → Camera edges
-      if (event.cameraId) {
-        for (const pid of event.personsInvolved) {
-          const existing = this.memory.knowledgeGraph.getEdges(pid);
-          const hasSeen = existing.some(
-            (e) =>
-              e.to === `camera:${event.cameraId}` ||
-              e.from === `camera:${event.cameraId}`,
-          );
-          if (!hasSeen) {
-            this.memory.knowledgeGraph.addEdge(
-              pid,
-              `camera:${event.cameraId}`,
-              "SEEN_AT",
-              {
-                timestamp: event.timestamp.toISOString(),
-                cameraId: event.cameraId,
-              },
-            );
-            facts.push({
-              type: "relationship",
-              description: `Pessoa ${pid} vista na câmera ${event.cameraId}`,
-              entities: [pid, event.cameraId],
-            });
-          }
-        }
-      }
-
-      // Person → ASSOCIATED_WITH → Vehicle edges
       if (vehicleId) {
         for (const pid of event.personsInvolved) {
-          const vehicles = this.memory.knowledgeGraph.getVehiclesForPerson(pid);
-          if (!vehicles.includes(vehicleId)) {
-            this.memory.knowledgeGraph.addEdge(
-              pid,
-              vehicleId,
-              "ASSOCIATED_WITH",
-              {
-                confidence: 0.5,
-                firstSeen: event.timestamp.toISOString(),
-              },
-            );
-            facts.push({
-              type: "relationship",
-              description: `Pessoa ${pid} associada ao veículo ${vehicleId}`,
-              entities: [pid, vehicleId],
-            });
-          }
-        }
-      }
-
-      // Vehicle node creation
-      if (vehicleId && !this.memory.knowledgeGraph.getNode(vehicleId)) {
-        this.memory.knowledgeGraph.addNode({
-          id: vehicleId,
-          type: "VEHICLE",
-          label: (event.payload.vehicleDescription as string) ?? vehicleId,
-          properties: {
-            firstSeen: event.timestamp.toISOString(),
-            source: event.cameraId,
-          },
-        });
-      }
-
-      // Person node creation
-      for (const pid of event.personsInvolved) {
-        if (!this.memory.knowledgeGraph.getNode(pid)) {
-          this.memory.knowledgeGraph.addNode({
-            id: pid,
-            type: "PERSON",
-            label: pid,
-            properties: {
-              firstSeen: event.timestamp.toISOString(),
-            },
+          facts.push({
+            type: "relationship",
+            description: `Pessoa ${pid} associada ao veículo ${vehicleId}`,
+            entities: [pid, vehicleId],
           });
         }
       }

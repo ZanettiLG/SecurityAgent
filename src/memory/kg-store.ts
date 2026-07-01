@@ -83,7 +83,7 @@ export class PersistentKnowledgeGraph extends KnowledgeGraph {
         properties: JSON.parse((row.properties as string) || "{}"),
         createdAt: new Date(row.created_at as string),
       };
-      (this as unknown as { edges: GraphEdge[] }).edges.push(edge);
+      super._pushEdge(edge);
     }
 
     logger.info(
