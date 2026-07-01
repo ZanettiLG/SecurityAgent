@@ -11,7 +11,7 @@ import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { logger } from "../core/logger.js";
-import type { RoutineProfile } from "./routine_learner.js";
+import type { RoutineProfile } from "./routine-learner.js";
 
 // ── Serialization helpers ────────────────────────────────────────
 

@@ -27,7 +27,7 @@ import {
 import { VisionPipeline } from "../processing/vision-pipeline.js";
 import { VehicleTracker } from "../processing/vehicle-tracker.js";
 import { MemorySystem } from "../memory/system.js";
-import { RoutineLearner } from "../memory/routine_learner.js";
+import { RoutineLearner } from "../memory/routine-learner.js";
 import { PatternMiner } from "../memory/pattern_miner.js";
 import {
   GoapAgent,

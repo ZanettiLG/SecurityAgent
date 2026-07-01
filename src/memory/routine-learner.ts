@@ -16,7 +16,12 @@ import type { PersistentRoutineStore } from "./routine-store.js";
 export interface RoutineProfile {
   entityId: string;
   entityType:
-    "camera" | "person" | "vehicle" | "location" | "universal" | "category";
+    | "camera"
+    | "person"
+    | "vehicle"
+    | "location"
+    | "universal"
+    | "category";
   hourlyActivity: number[]; // 24 floats
   dailyActivity: number[]; // 7 floats
   typicalEvents: Map<string, TypicalEvent[]>;
