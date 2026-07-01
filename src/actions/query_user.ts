@@ -4,9 +4,11 @@
 
 import { logger } from "../core/logger.js";
 import type { EventBus } from "../core/bus.js";
+import type { ConversationStore } from "../memory/conversation-store.js";
 
 export type QuestionPriority = "low" | "medium" | "high" | "critical";
-export type QuestionStatus = "pending" | "asked" | "answered" | "ignored" | "expired";
+export type QuestionStatus =
+  "pending" | "asked" | "answered" | "ignored" | "expired";
 
 export interface Question {
   questionId: string;
@@ -51,11 +53,17 @@ export const VIGIA_QUESTIONS = {
 export class QueryManager {
   private pendingQuestions: Question[] = [];
   private askedQuestions = new Map<string, Question>();
-  private conversationHistory: Array<{ questionId: string; text: string; answer: string; ts: Date }> = [];
+  private conversationHistory: Array<{
+    questionId: string;
+    text: string;
+    answer: string;
+    ts: Date;
+  }> = [];
   private tone: "informative" | "casual" | "humoristico" = "informative";
 
   constructor(
     private bus?: EventBus,
+    private conversationStore?: ConversationStore,
   ) {}
 
   createQuestion(params: {
@@ -101,7 +109,11 @@ export class QueryManager {
       q.status = "asked";
       q.askedAt = new Date();
       this.askedQuestions.set(q.questionId, q);
-      this.bus?.publish("query.user", { questionId: q.questionId, text: formatted, priority: q.priority });
+      this.bus?.publish("query.user", {
+        questionId: q.questionId,
+        text: formatted,
+        priority: q.priority,
+      });
       asked.push(q);
       logger.info(`Question asked: ${formatted.slice(0, 80)}...`);
     }
@@ -121,7 +133,26 @@ export class QueryManager {
     q.status = "answered";
 
     const processed = await this.processAnswerByType(q, answer);
-    this.conversationHistory.push({ questionId, text: q.text, answer, ts: new Date() });
+    this.conversationHistory.push({
+      questionId,
+      text: q.text,
+      answer,
+      ts: new Date(),
+    });
+
+    // Persist to ConversationStore if available
+    if (this.conversationStore) {
+      await this.conversationStore.insert({
+        questionId,
+        text: q.text,
+        answer,
+        askedAt: q.askedAt ?? q.createdAt,
+        answeredAt: q.answeredAt,
+        priority: q.priority,
+        relatedEntities: q.relatedEntities,
+        relatedEventId: q.relatedEventId,
+      });
+    }
 
     if (q.onAnswer) {
       await q.onAnswer(answer, processed);
@@ -130,7 +161,10 @@ export class QueryManager {
     return processed;
   }
 
-  private async processAnswerByType(q: Question, answer: string): Promise<unknown> {
+  private async processAnswerByType(
+    q: Question,
+    answer: string,
+  ): Promise<unknown> {
     if (q.expectedAnswerType === "yes_no") {
       const lower = answer.toLowerCase();
       return ["sim", "s", "yes", "y", "claro", "pode"].includes(lower);
@@ -147,7 +181,8 @@ export class QueryManager {
   }
 
   getConversationSummary(): string {
-    if (!this.conversationHistory.length) return "Nenhuma pergunta nesta sessão.";
+    if (!this.conversationHistory.length)
+      return "Nenhuma pergunta nesta sessão.";
     const lines = ["Resumo da conversa:"];
     for (const entry of this.conversationHistory.slice(-10)) {
       lines.push(`  Q: ${entry.text.slice(0, 60)}...`);

@@ -148,15 +148,26 @@ export class SecurityAgent {
 
     // Vigia subsystems
     this.vehicleTracker = new VehicleTracker(this.memory, this.bus);
-    this.routineLearner = new RoutineLearner(this.memory, {
-      learningRate: this.config.vigia.routines.learningRate,
-      atypicalThreshold: this.config.vigia.routines.atypicalThreshold,
-      minObservations: this.config.vigia.routines.minObservations,
-    });
+    this.routineLearner = new RoutineLearner(
+      this.memory,
+      {
+        learningRate: this.config.vigia.routines.learningRate,
+        atypicalThreshold: this.config.vigia.routines.atypicalThreshold,
+        minObservations: this.config.vigia.routines.minObservations,
+      },
+      this.memory?.routineStore,
+    );
     this.patternMiner = new PatternMiner(this.memory, this.routineLearner);
-    this.hypothesisEngine = new HypothesisEngine(this.llmClient, this.memory);
+    this.hypothesisEngine = new HypothesisEngine(
+      this.llmClient,
+      this.memory,
+      this.memory?.hypothesisStore,
+    );
     this.behaviorMatcher = new BehavioralPatternMatcher();
-    this.queryManager = new QueryManager(this.bus);
+    this.queryManager = new QueryManager(
+      this.bus,
+      this.memory?.conversationStore,
+    );
     this.socialInvestigator = new SocialMediaInvestigator();
     this.socialPredictor = new SocialPredictionEngine(
       this.memory,
