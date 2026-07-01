@@ -7,11 +7,14 @@
  */
 
 import { logger } from "../core/logger.js";
+import type { SecurityEvent } from "../core/types.js";
 
 // ── Type Definitions ────────────────────────────────────────────
 
-export type NodeType = "PERSON" | "VEHICLE" | "CAMERA" | "LOCATION" | "INCIDENT";
-export type EdgeType = "VISITED_WITH" | "ASSOCIATED_WITH" | "SEEN_AT" | "ENTERED_THROUGH" | "OWNS";
+export type NodeType =
+  "PERSON" | "VEHICLE" | "CAMERA" | "LOCATION" | "INCIDENT";
+export type EdgeType =
+  "VISITED_WITH" | "ASSOCIATED_WITH" | "SEEN_AT" | "ENTERED_THROUGH" | "OWNS";
 
 export interface GraphNode {
   id: string;
@@ -40,7 +43,10 @@ export class KnowledgeGraph {
 
   addNode(node: GraphNode): void {
     if (this.nodes.has(node.id)) {
-      logger.warn({ nodeId: node.id }, "KnowledgeGraph: overwriting existing node");
+      logger.warn(
+        { nodeId: node.id },
+        "KnowledgeGraph: overwriting existing node",
+      );
     }
     this.nodes.set(node.id, node);
   }
@@ -71,10 +77,16 @@ export class KnowledgeGraph {
   ): void {
     // Validate that both nodes exist
     if (!this.nodes.has(from)) {
-      logger.warn({ from, to, type }, "KnowledgeGraph: adding edge with unknown 'from' node");
+      logger.warn(
+        { from, to, type },
+        "KnowledgeGraph: adding edge with unknown 'from' node",
+      );
     }
     if (!this.nodes.has(to)) {
-      logger.warn({ from, to, type }, "KnowledgeGraph: adding edge with unknown 'to' node");
+      logger.warn(
+        { from, to, type },
+        "KnowledgeGraph: adding edge with unknown 'to' node",
+      );
     }
 
     const edge: GraphEdge = {
@@ -86,6 +98,83 @@ export class KnowledgeGraph {
     };
 
     this.edges.push(edge);
+  }
+
+  /**
+   * Protected helper for subclasses (e.g., PersistentKnowledgeGraph)
+   * to push edges directly without triggering write-through.
+   * Used when restoring state from SQLite on load().
+   */
+  protected _pushEdge(edge: GraphEdge): void {
+    this.edges.push(edge);
+  }
+
+  /**
+   * Ensure KG edges exist for a SecurityEvent:
+   * - Person → SEEN_AT → Camera
+   * - Person ↔ ASSOCIATED_WITH → Vehicle
+   * Skips if edge already exists (idempotent).
+   */
+  ensureEdgesForEvent(event: SecurityEvent): void {
+    if (event.cameraId) {
+      const cameraNodeId = `camera:${event.cameraId}`;
+      if (!this.getNode(cameraNodeId)) {
+        this.addNode({
+          id: cameraNodeId,
+          type: "CAMERA",
+          label: event.cameraId,
+          properties: { cameraId: event.cameraId },
+        });
+      }
+      for (const pid of event.personsInvolved) {
+        const existing = this.getEdges(pid);
+        const hasSeen = existing.some(
+          (e) => e.to === cameraNodeId || e.from === cameraNodeId,
+        );
+        if (!hasSeen) {
+          this.addEdge(pid, cameraNodeId, "SEEN_AT", {
+            timestamp: event.timestamp.toISOString(),
+            cameraId: event.cameraId,
+          });
+        }
+      }
+    }
+
+    const vehicleId = event.payload.vehicleId as string | undefined;
+    if (vehicleId) {
+      if (!this.getNode(vehicleId)) {
+        this.addNode({
+          id: vehicleId,
+          type: "VEHICLE",
+          label: (event.payload.vehicleDescription as string) ?? vehicleId,
+          properties: {
+            firstSeen: event.timestamp.toISOString(),
+            source: event.cameraId,
+          },
+        });
+      }
+      for (const pid of event.personsInvolved) {
+        const vehicles = this.getVehiclesForPerson(pid);
+        if (!vehicles.includes(vehicleId)) {
+          this.addEdge(pid, vehicleId, "ASSOCIATED_WITH", {
+            confidence: 0.5,
+            firstSeen: event.timestamp.toISOString(),
+          });
+        }
+      }
+    }
+
+    // Ensure person nodes exist
+    for (const pid of event.personsInvolved) {
+      if (!this.getNode(pid)) {
+        this.addNode({
+          id: pid,
+          type: "PERSON",
+          label: pid,
+          properties: { firstSeen: event.timestamp.toISOString() },
+        });
+      }
+    }
   }
 
   getEdges(nodeId: string, edgeType?: EdgeType): GraphEdge[] {
@@ -133,10 +222,7 @@ export class KnowledgeGraph {
   getVehiclesForPerson(personId: string): string[] {
     const vehicles = new Set<string>();
     for (const edge of this.edges) {
-      if (
-        edge.type === "ASSOCIATED_WITH" ||
-        edge.type === "OWNS"
-      ) {
+      if (edge.type === "ASSOCIATED_WITH" || edge.type === "OWNS") {
         if (edge.from === personId) {
           const target = this.nodes.get(edge.to);
           if (target?.type === "VEHICLE") vehicles.add(edge.to);
@@ -154,10 +240,7 @@ export class KnowledgeGraph {
   getPersonsForVehicle(vehicleId: string): string[] {
     const persons = new Set<string>();
     for (const edge of this.edges) {
-      if (
-        edge.type === "ASSOCIATED_WITH" ||
-        edge.type === "OWNS"
-      ) {
+      if (edge.type === "ASSOCIATED_WITH" || edge.type === "OWNS") {
         if (edge.from === vehicleId) {
           const target = this.nodes.get(edge.to);
           if (target?.type === "PERSON") persons.add(edge.to);
@@ -248,6 +331,122 @@ export class KnowledgeGraph {
   }
 
   // ═══════════════════════════════════════════════════════════════
+  // Context Linking (Issue #1 — Context Linking Engine)
+  // ═══════════════════════════════════════════════════════════════
+
+  /**
+   * Find nodes similar to the given node based on shared neighbors.
+   * Uses Jaccard similarity on neighbor sets.
+   */
+  findSimilarNodes(
+    nodeId: string,
+    threshold = 0.3,
+    maxResults = 5,
+  ): Array<{ node: GraphNode; similarity: number }> {
+    const node = this.nodes.get(nodeId);
+    if (!node) return [];
+
+    const myNeighbors = new Set(this.getNeighbors(nodeId).map((n) => n.id));
+    if (myNeighbors.size === 0) return [];
+
+    const candidates: Array<{ node: GraphNode; similarity: number }> = [];
+
+    for (const [candidateId, candidateNode] of this.nodes) {
+      if (candidateId === nodeId) continue;
+      if (candidateNode.type !== node.type) continue;
+
+      const candidateNeighbors = new Set(
+        this.getNeighbors(candidateId).map((n) => n.id),
+      );
+      if (candidateNeighbors.size === 0) continue;
+
+      // Jaccard similarity
+      const intersection = new Set(
+        [...myNeighbors].filter((x) => candidateNeighbors.has(x)),
+      );
+      const union = new Set([...myNeighbors, ...candidateNeighbors]);
+      const similarity = intersection.size / union.size;
+
+      if (similarity >= threshold) {
+        candidates.push({ node: candidateNode, similarity });
+      }
+    }
+
+    candidates.sort((a, b) => b.similarity - a.similarity);
+    return candidates.slice(0, maxResults);
+  }
+
+  /**
+   * Merge two nodes into one. Transfers all edges from source to target,
+   * then deletes source. Used when we discover two entities are the same.
+   */
+  mergeNodes(sourceId: string, targetId: string): void {
+    const source = this.nodes.get(sourceId);
+    const target = this.nodes.get(targetId);
+    if (!source || !target) {
+      logger.warn(
+        { sourceId, targetId },
+        "Cannot merge: one or both nodes not found",
+      );
+      return;
+    }
+
+    // Transfer all edges from source to target
+    for (const edge of this.edges) {
+      if (edge.from === sourceId) edge.from = targetId;
+      if (edge.to === sourceId) edge.to = targetId;
+    }
+
+    // Merge properties (target wins on conflict)
+    target.properties = { ...source.properties, ...target.properties };
+
+    // Remove source node
+    this.nodes.delete(sourceId);
+    logger.info({ sourceId, targetId }, "Nodes merged");
+  }
+
+  /**
+   * Get full context for an entity: its node, neighbors, relationships,
+   * and similar entities. Used by Context Compiler to enrich LLM prompts.
+   */
+  getFullContext(nodeId: string): Record<string, unknown> {
+    const node = this.nodes.get(nodeId);
+    if (!node) return {};
+
+    const neighbors = this.getNeighbors(nodeId).map((n) => ({
+      id: n.id,
+      type: n.type,
+      label: n.label,
+      properties: n.properties,
+    }));
+
+    const edges = this.getEdges(nodeId).map((e) => ({
+      type: e.type,
+      from: e.from,
+      to: e.to,
+      properties: e.properties,
+    }));
+
+    const similar = this.findSimilarNodes(nodeId, 0.3, 3);
+
+    return {
+      entity: {
+        id: node.id,
+        type: node.type,
+        label: node.label,
+        properties: node.properties,
+      },
+      neighbors,
+      edges,
+      similarEntities: similar.map((s) => ({
+        id: s.node.id,
+        label: s.node.label,
+        similarity: s.similarity,
+      })),
+    };
+  }
+
+  // ═══════════════════════════════════════════════════════════════
   // Serialization
   // ═══════════════════════════════════════════════════════════════
 
@@ -258,7 +457,10 @@ export class KnowledgeGraph {
     };
   }
 
-  static fromJSON(data: { nodes: GraphNode[]; edges: GraphEdge[] }): KnowledgeGraph {
+  static fromJSON(data: {
+    nodes: GraphNode[];
+    edges: GraphEdge[];
+  }): KnowledgeGraph {
     const graph = new KnowledgeGraph();
     for (const node of data.nodes) {
       graph.addNode(node);

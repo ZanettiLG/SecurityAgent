@@ -4,19 +4,22 @@
 
 import type { PersonRecord } from "../core/types.js";
 import type { MemorySystem } from "./system.js";
-import type { RoutineLearner } from "./routine_learner.js";
+import type { RoutineLearner } from "./routine-learner.js";
 
 export interface FrequencyComparison {
   personId: string;
   frequencyPerWeek: number;
   daysAnalyzed: number;
   totalSightings: number;
-  comparisons: Record<string, {
-    referenceFrequency: number;
-    personFrequency: number;
-    ratio: number;
-    interpretation: string;
-  }>;
+  comparisons: Record<
+    string,
+    {
+      referenceFrequency: number;
+      personFrequency: number;
+      ratio: number;
+      interpretation: string;
+    }
+  >;
   conclusion: string;
 }
 
@@ -26,11 +29,16 @@ export class PatternMiner {
     private routineLearner?: RoutineLearner,
   ) {}
 
-  async compareFrequencies(personId: string, days = 60): Promise<FrequencyComparison> {
-    const person = this.memory ? await this.memory.personRegistry.get(personId) : undefined;
+  async compareFrequencies(
+    personId: string,
+    days = 60,
+  ): Promise<FrequencyComparison> {
+    const person = this.memory
+      ? await this.memory.personRegistry.get(personId)
+      : undefined;
 
     const frequencyPerWeek = person
-      ? (person.totalVisits / Math.max(1, days / 7))
+      ? person.totalVisits / Math.max(1, days / 7)
       : 0;
 
     const references: Record<string, number> = {
@@ -49,14 +57,21 @@ export class PatternMiner {
         personFrequency: Math.round(frequencyPerWeek * 100) / 100,
         ratio: Math.round(ratio * 100) / 100,
         interpretation:
-          ratio > 2 ? "muito acima" :
-          ratio > 1.3 ? "acima" :
-          ratio > 0.7 ? "similar" :
-          ratio > 0.3 ? "abaixo" : "muito abaixo",
+          ratio > 2
+            ? "muito acima"
+            : ratio > 1.3
+              ? "acima"
+              : ratio > 0.7
+                ? "similar"
+                : ratio > 0.3
+                  ? "abaixo"
+                  : "muito abaixo",
       };
     }
 
-    const maxRatio = Math.max(...Object.values(comparisons).map((c) => c.ratio));
+    const maxRatio = Math.max(
+      ...Object.values(comparisons).map((c) => c.ratio),
+    );
     const conclusion =
       maxRatio > 2
         ? `Frequência (${frequencyPerWeek.toFixed(1)}/sem) significativamente superior. Probabilidade elevada de relacionamento próximo.`

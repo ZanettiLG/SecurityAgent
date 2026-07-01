@@ -27,7 +27,7 @@ import {
 import { VisionPipeline } from "../processing/vision-pipeline.js";
 import { VehicleTracker } from "../processing/vehicle-tracker.js";
 import { MemorySystem } from "../memory/system.js";
-import { RoutineLearner } from "../memory/routine_learner.js";
+import { RoutineLearner } from "../memory/routine-learner.js";
 import { PatternMiner } from "../memory/pattern_miner.js";
 import {
   GoapAgent,
@@ -51,8 +51,10 @@ import {
   createCameraConnector,
   type CameraConnector,
 } from "../perception/camera-connector.js";
-import { KnowledgeGraph } from "../memory/knowledge-graph.js";
 import { SocialMediaInvestigator } from "../processing/social-investigator.js";
+import { createDefaultSceneContext } from "../memory/scene-context-store.js";
+import { ConsolidationEngine } from "../memory/consolidation.js";
+import type { SceneContext } from "../core/types.js";
 
 // ── Agent ────────────────────────────────────────────────────────
 
@@ -82,8 +84,9 @@ export class SecurityAgent {
   socialPredictor: SocialPredictionEngine | null = null;
   queryManager: QueryManager | null = null;
   behaviorMatcher: BehavioralPatternMatcher | null = null;
-  knowledgeGraph: KnowledgeGraph | null = null;
   retrospectiveAnalyzer: RetrospectiveAnalyzer | null = null;
+  sceneContexts: Map<string, SceneContext> = new Map();
+  consolidationEngine: ConsolidationEngine | null = null;
 
   // Timing
   private tickInterval: ReturnType<typeof setInterval> | null = null;
@@ -143,20 +146,30 @@ export class SecurityAgent {
 
     // Vigia subsystems
     this.vehicleTracker = new VehicleTracker(this.memory, this.bus);
-    this.routineLearner = new RoutineLearner(this.memory, {
-      learningRate: this.config.vigia.routines.learningRate,
-      atypicalThreshold: this.config.vigia.routines.atypicalThreshold,
-      minObservations: this.config.vigia.routines.minObservations,
-    });
+    this.routineLearner = new RoutineLearner(
+      this.memory,
+      {
+        learningRate: this.config.vigia.routines.learningRate,
+        atypicalThreshold: this.config.vigia.routines.atypicalThreshold,
+        minObservations: this.config.vigia.routines.minObservations,
+      },
+      this.memory?.routineStore,
+    );
     this.patternMiner = new PatternMiner(this.memory, this.routineLearner);
-    this.hypothesisEngine = new HypothesisEngine(this.llmClient, this.memory);
+    this.hypothesisEngine = new HypothesisEngine(
+      this.llmClient,
+      this.memory,
+      this.memory?.hypothesisStore,
+    );
     this.behaviorMatcher = new BehavioralPatternMatcher();
-    this.queryManager = new QueryManager(this.bus);
-    this.knowledgeGraph = new KnowledgeGraph();
+    this.queryManager = new QueryManager(
+      this.bus,
+      this.memory?.conversationStore,
+    );
     this.socialInvestigator = new SocialMediaInvestigator();
     this.socialPredictor = new SocialPredictionEngine(
       this.memory,
-      this.knowledgeGraph,
+      this.memory.knowledgeGraph,
     );
     this.retrospectiveAnalyzer = new RetrospectiveAnalyzer(
       this.memory,
@@ -167,6 +180,17 @@ export class SecurityAgent {
     // Register default behavioral signatures
     for (const sig of createDefaultSignatures()) {
       this.behaviorMatcher.registerSignature(sig);
+    }
+
+    // Load SceneContexts for each camera from SQLite
+    for (const cam of this.config.cameras.filter((c) => c.enabled)) {
+      let ctx = await this.memory.sceneContextStore.get(cam.id);
+      if (!ctx) {
+        ctx = createDefaultSceneContext(cam.id, cam.name);
+        await this.memory.sceneContextStore.save(ctx);
+        logger.info({ cameraId: cam.id }, "Default SceneContext created");
+      }
+      this.sceneContexts.set(cam.id, ctx);
     }
 
     logger.info("All subsystems initialized");
@@ -240,11 +264,6 @@ export class SecurityAgent {
       void this.goapTick();
     }, goapInterval);
 
-    // Consolidação de memória (a cada 1h)
-    setInterval(() => {
-      void this.consolidateMemory();
-    }, 3_600_000);
-
     // Vigia: observação contínua (a cada 60s)
     setInterval(() => {
       void this.vigiaObserve();
@@ -254,6 +273,14 @@ export class SecurityAgent {
     setInterval(() => {
       void this.processPendingQueries();
     }, 5_000);
+
+    // Consolidation engine (Issue #1 — auto-aprendizado contínuo)
+    this.consolidationEngine = new ConsolidationEngine(
+      this.memory!,
+      this.llmClient ?? undefined,
+      { intervalMs: 300_000 }, // every 5 minutes
+    );
+    this.consolidationEngine.start();
 
     logger.info("Agent loop started");
 
@@ -266,6 +293,9 @@ export class SecurityAgent {
   async handleEvent(event: SecurityEvent): Promise<void> {
     // 1. Armazenar na memória
     await this.storeInMemory(event);
+
+    // 1b. Enriquecer evento com contexto do Knowledge Graph
+    await this.enrichEventWithContext(event);
 
     // 2. Aprender rotina (Vigia — 3 camadas)
     await this.learnRoutine(event);
@@ -321,6 +351,39 @@ export class SecurityAgent {
 
   private async storeInMemory(event: SecurityEvent): Promise<void> {
     await this.memory?.store(event);
+  }
+
+  private async enrichEventWithContext(event: SecurityEvent): Promise<void> {
+    if (!this.memory) return;
+
+    // Enrich with KG context for persons involved
+    for (const pid of event.personsInvolved) {
+      const ctx = this.memory.knowledgeGraph.getFullContext(pid);
+      if (ctx.entity) {
+        if (!event.payload.kgContext) {
+          event.payload.kgContext = {};
+        }
+        const kgCtx = event.payload.kgContext as Record<string, unknown>;
+        kgCtx[pid] = ctx;
+      }
+    }
+
+    // Enrich with KG context for vehicles
+    const vehicleId = event.payload.vehicleId as string | undefined;
+    if (vehicleId) {
+      const ctx = this.memory.knowledgeGraph.getFullContext(vehicleId);
+      if (ctx.entity) {
+        if (!event.payload.kgContext) {
+          event.payload.kgContext = {};
+        }
+        const kgCtx = event.payload.kgContext as Record<string, unknown>;
+        kgCtx[vehicleId] = ctx;
+      }
+    }
+
+    // Edge creation moved to KnowledgeGraph.ensureEdgesForEvent()
+    // called by ConsolidationEngine.extractRelationships() to avoid
+    // duplicating logic in the hot path.
   }
 
   private async learnRoutine(event: SecurityEvent): Promise<void> {
@@ -413,7 +476,19 @@ export class SecurityAgent {
   private async llmEvaluate(event: SecurityEvent): Promise<void> {
     if (!this.llmClient || !this.memory) return;
     try {
-      const context = await this.memory.getContextForLlm(event);
+      const sceneCtx = event.cameraId
+        ? this.sceneContexts.get(event.cameraId)
+        : undefined;
+      const compiledContext = await this.memory.getContextForLlm(
+        event,
+        sceneCtx,
+      );
+      const context = {
+        compiledContext,
+        sceneContext: sceneCtx,
+        cameraId: event.cameraId,
+        eventType: event.eventType,
+      };
       const assessment = await this.llmClient.evaluate(event, context);
       this.bus.publish(
         "llm.assessment",
@@ -436,8 +511,10 @@ export class SecurityAgent {
   ): Promise<void> {
     if (!this.hypothesisEngine || !this.memory) return;
     try {
-      const context = await this.memory.getContextForLlm(event);
-      await this.hypothesisEngine.generateFromEvent(event, context);
+      const contextStr = await this.memory.getContextForLlm(event);
+      await this.hypothesisEngine.generateFromEvent(event, {
+        compiledContext: contextStr,
+      });
     } catch (err) {
       logger.error(
         { err, eventId: event.eventId },
@@ -482,8 +559,10 @@ export class SecurityAgent {
       const recent = await this.memory.eventStore.getRecent(60);
       const anomalous = recent.filter((e) => e.anomalyScore > 0.5);
       for (const event of anomalous.slice(0, 3)) {
-        const context = await this.memory.getContextForLlm(event);
-        void this.hypothesisEngine.generateFromEvent(event, context);
+        const contextStr = await this.memory.getContextForLlm(event);
+        void this.hypothesisEngine.generateFromEvent(event, {
+          compiledContext: contextStr,
+        });
       }
     }
 

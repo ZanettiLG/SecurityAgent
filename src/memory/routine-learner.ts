@@ -9,14 +9,21 @@
 import { logger } from "../core/logger.js";
 import type { SecurityEvent, PersonRecord } from "../core/types.js";
 import type { MemorySystem } from "./system.js";
+import type { PersistentRoutineStore } from "./routine-store.js";
 
 // ── Routine Profile ──────────────────────────────────────────────
 
 export interface RoutineProfile {
   entityId: string;
-  entityType: "camera" | "person" | "vehicle" | "location" | "universal" | "category";
-  hourlyActivity: number[];   // 24 floats
-  dailyActivity: number[];    // 7 floats
+  entityType:
+    | "camera"
+    | "person"
+    | "vehicle"
+    | "location"
+    | "universal"
+    | "category";
+  hourlyActivity: number[]; // 24 floats
+  dailyActivity: number[]; // 7 floats
   typicalEvents: Map<string, TypicalEvent[]>;
   totalObservations: number;
   daysOfData: number;
@@ -41,7 +48,12 @@ export class RoutineLearner {
 
   constructor(
     private memory?: MemorySystem,
-    opts?: { learningRate?: number; atypicalThreshold?: number; minObservations?: number },
+    opts?: {
+      learningRate?: number;
+      atypicalThreshold?: number;
+      minObservations?: number;
+    },
+    private routineStore?: PersistentRoutineStore,
   ) {
     this.learningRate = opts?.learningRate ?? 0.05;
     this.atypicalThreshold = opts?.atypicalThreshold ?? 0.15;
@@ -58,7 +70,13 @@ export class RoutineLearner {
 
     // Camada 3 — Por ator específico
     if (event.cameraId) {
-      this.updateProfile(`camera:${event.cameraId}`, "camera", hour, day, event);
+      this.updateProfile(
+        `camera:${event.cameraId}`,
+        "camera",
+        hour,
+        day,
+        event,
+      );
     }
     for (const pid of event.personsInvolved) {
       this.updateProfile(`person:${pid}`, "person", hour, day, event);
@@ -114,21 +132,26 @@ export class RoutineLearner {
     const alpha = this.learningRate;
 
     // Atualiza atividade horária (EMA)
-    profile.hourlyActivity[hour] = (1 - alpha) * profile.hourlyActivity[hour]! + alpha * 1;
+    profile.hourlyActivity[hour] =
+      (1 - alpha) * profile.hourlyActivity[hour]! + alpha * 1;
     // Suaviza horas vizinhas
     for (let h = Math.max(0, hour - 1); h <= Math.min(23, hour + 1); h++) {
       if (h !== hour) {
-        profile.hourlyActivity[h] = (1 - alpha * 0.3) * profile.hourlyActivity[h]! + alpha * 0.3 * 0.5;
+        profile.hourlyActivity[h] =
+          (1 - alpha * 0.3) * profile.hourlyActivity[h]! + alpha * 0.3 * 0.5;
       }
     }
 
     // Atualiza atividade diária
-    profile.dailyActivity[day] = (1 - alpha) * profile.dailyActivity[day]! + alpha * 1;
+    profile.dailyActivity[day] =
+      (1 - alpha) * profile.dailyActivity[day]! + alpha * 1;
 
     // Registra evento típico
     const hourKey = `${String(hour).padStart(2, "0")}:00`;
     const eventSig = `${event.eventType}:${event.description.slice(0, 50)}`;
-    const existing = profile.typicalEvents.get(hourKey)?.find((e) => e.signature === eventSig);
+    const existing = profile.typicalEvents
+      .get(hourKey)
+      ?.find((e) => e.signature === eventSig);
 
     if (existing) {
       existing.frequency++;
@@ -148,11 +171,16 @@ export class RoutineLearner {
 
     profile.totalObservations++;
     profile.lastUpdated = new Date();
+
+    // Write-through to SQLite if store available
+    if (this.routineStore) {
+      void this.routineStore.save(profile);
+    }
   }
 
   /**
    * Pontua quão atípico é um evento.
-   * 
+   *
    * Ordem de avaliação:
    * 1. Camada 3 (ator específico) — se existir, usa ela
    * 2. Camada 2 (categoria) — se existir
@@ -211,10 +239,7 @@ export class RoutineLearner {
    * - Muitas observações totais → "neighbor"
    * - Default → "visitor"
    */
-  categorizeActor(
-    personId?: string,
-    vehicleId?: string,
-  ): string | null {
+  categorizeActor(personId?: string, vehicleId?: string): string | null {
     const entityId = personId
       ? `person:${personId}`
       : vehicleId
@@ -228,7 +253,8 @@ export class RoutineLearner {
 
     // Atividade noturna (22h-05h)
     const nightActivity = profile.hourlyActivity
-      .slice(22).concat(profile.hourlyActivity.slice(0, 5))
+      .slice(22)
+      .concat(profile.hourlyActivity.slice(0, 5))
       .reduce((a, b) => a + b, 0);
 
     // Atividade em horário comercial (08h-18h)
@@ -263,13 +289,17 @@ export class RoutineLearner {
 
     const parts: string[] = [];
     if (activeHours.length > 0) {
-      parts.push(`Atividade concentrada às ${activeHours.map((h) => `${String(h.hour).padStart(2, "0")}h`).join(", ")}`);
+      parts.push(
+        `Atividade concentrada às ${activeHours.map((h) => `${String(h.hour).padStart(2, "0")}h`).join(", ")}`,
+      );
     }
 
     for (const [hourKey, events] of profile.typicalEvents) {
       for (const evt of events) {
         if (evt.frequency >= 5) {
-          parts.push(`${evt.description} — ${evt.frequency}x por volta das ${hourKey}`);
+          parts.push(
+            `${evt.description} — ${evt.frequency}x por volta das ${hourKey}`,
+          );
         }
       }
     }

@@ -10,6 +10,7 @@ import { logger } from "../core/logger.js";
 import { MockConnector } from "./mock-connector.js";
 import { RtspConnector } from "./rtsp-connector.js";
 import { OnvifConnector } from "./onvif-connector.js";
+import type { SceneContext } from "../core/types.js";
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -25,6 +26,7 @@ export interface CameraConnector {
   readonly cameraId: string;
   readonly source: string;
   readonly enabled: boolean;
+  sceneContext?: SceneContext;
 
   connect(): Promise<void>;
   disconnect(): Promise<void>;

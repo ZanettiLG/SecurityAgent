@@ -4,6 +4,7 @@
 
 import { logger } from "../core/logger.js";
 import type { SecurityEvent } from "../core/types.js";
+import type { HypothesisStore } from "../memory/hypothesis-store.js";
 
 export type HypothesisStatus =
   | "draft"
@@ -31,16 +32,31 @@ export interface Hypothesis {
 
 export class HypothesisEngine {
   private hypotheses: Hypothesis[] = [];
+  private hypothesisStore: HypothesisStore | undefined;
 
   constructor(
     private llmClient?: unknown,
     private memory?: unknown,
-  ) {}
+    hypothesisStore?: HypothesisStore,
+  ) {
+    this.hypothesisStore = hypothesisStore;
+  }
 
-  async generateFromEvent(event: SecurityEvent, context: Record<string, unknown>): Promise<Hypothesis[]> {
+  async generateFromEvent(
+    event: SecurityEvent,
+    context: Record<string, unknown>,
+  ): Promise<Hypothesis[]> {
     // TODO: Integrate with LLM to generate hypotheses
     logger.info({ eventId: event.eventId }, "Hypothesis generation triggered");
-    return [];
+    const generated: Hypothesis[] = [];
+
+    for (const h of generated) {
+      if (this.hypothesisStore) {
+        await this.hypothesisStore.save(h);
+      }
+    }
+
+    return generated;
   }
 
   confirmByUser(hypothesisId: string, feedback = ""): void {
@@ -50,6 +66,9 @@ export class HypothesisEngine {
       h.userFeedback = feedback;
       h.resolvedAt = new Date();
       h.probability = 1.0;
+      if (this.hypothesisStore) {
+        void this.hypothesisStore.save(h);
+      }
     }
   }
 
@@ -60,12 +79,16 @@ export class HypothesisEngine {
       h.userFeedback = feedback;
       h.resolvedAt = new Date();
       h.probability = 0;
+      if (this.hypothesisStore) {
+        void this.hypothesisStore.save(h);
+      }
     }
   }
 
   getActiveHypotheses(): Hypothesis[] {
     return this.hypotheses.filter(
-      (h) => !["user_confirmed", "user_rejected", "rejected"].includes(h.status),
+      (h) =>
+        !["user_confirmed", "user_rejected", "rejected"].includes(h.status),
     );
   }
 }
