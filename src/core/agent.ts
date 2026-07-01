@@ -51,7 +51,6 @@ import {
   createCameraConnector,
   type CameraConnector,
 } from "../perception/camera-connector.js";
-import { KnowledgeGraph } from "../memory/knowledge-graph.js";
 import { SocialMediaInvestigator } from "../processing/social-investigator.js";
 import { createDefaultSceneContext } from "../memory/scene-context-store.js";
 import { ConsolidationEngine } from "../memory/consolidation.js";
@@ -85,7 +84,6 @@ export class SecurityAgent {
   socialPredictor: SocialPredictionEngine | null = null;
   queryManager: QueryManager | null = null;
   behaviorMatcher: BehavioralPatternMatcher | null = null;
-  knowledgeGraph: KnowledgeGraph | null = null;
   retrospectiveAnalyzer: RetrospectiveAnalyzer | null = null;
   sceneContexts: Map<string, SceneContext> = new Map();
   consolidationEngine: ConsolidationEngine | null = null;

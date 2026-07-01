@@ -24,7 +24,6 @@ export interface ContextCompilerConfig {
   layerBudgets: {
     sceneContext: number;
     knowledgeGraph: number;
-    routines: number;
     recentEvents: number;
     activeHypotheses: number;
     conversationHistory: number;
@@ -36,7 +35,6 @@ const DEFAULT_CONFIG: ContextCompilerConfig = {
   layerBudgets: {
     sceneContext: 500,
     knowledgeGraph: 800,
-    routines: 400,
     recentEvents: 1000,
     activeHypotheses: 500,
     conversationHistory: 300,

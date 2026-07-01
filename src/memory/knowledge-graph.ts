@@ -409,7 +409,7 @@ export class KnowledgeGraph {
    * Get full context for an entity: its node, neighbors, relationships,
    * and similar entities. Used by Context Compiler to enrich LLM prompts.
    */
-  getFullContext(nodeId: string, depth = 1): Record<string, unknown> {
+  getFullContext(nodeId: string): Record<string, unknown> {
     const node = this.nodes.get(nodeId);
     if (!node) return {};
 
