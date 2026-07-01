@@ -87,12 +87,12 @@ data/
 
 ### 🔵 Medium (consider fixing)
 
-| #   | Issue                                                              | Arquivo               | Status |
-| --- | ------------------------------------------------------------------ | --------------------- | ------ |
-| 1   | Parâmetro `depth` em `getFullContext()` nunca usado                | `knowledge-graph.ts`  | Aberto |
-| 2   | `buildRoutineBlock()` nunca chamado em `ContextCompiler.compile()` | `context-compiler.ts` | Aberto |
-| 3   | `import { KnowledgeGraph }` obsoleto em agent.ts                   | `agent.ts:54`         | Aberto |
-| 4   | Nenhum teste unitário para os 7 novos stores                       | Vários                | Aberto |
+| #   | Issue                                               | Arquivo                               | Status                                                                                                        |
+| --- | --------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| 1   | Parâmetro `depth` em `getFullContext()` nunca usado | `knowledge-graph.ts`                  | ✅ **Resolvido** — param removido (commit `021d3a3`)                                                          |
+| 2   | `routines` budget nunca usado em `ContextCompiler`  | `context-compiler.ts`                 | ✅ **Resolvido** — budget removido do config (commit `021d3a3`)                                               |
+| 3   | `import { KnowledgeGraph }` + propriedade obsoleta  | `agent.ts`                            | ✅ **Resolvido** — import removido, propriedade removida, tudo via `memory.knowledgeGraph` (commit `021d3a3`) |
+| 4   | Nenhum teste unitário para os 7 novos stores        | `src/memory/__tests__/stores.test.ts` | ✅ **Resolvido** — 12 testes criados (commit `021d3a3`)                                                       |
 
 ### ⚪ Low (nice to have)
 
@@ -103,7 +103,7 @@ data/
 
 ## Summary
 
-🔴 0 critical, 🟡 2 resolved, 🔵 4 open, ⚪ 2 open.
+🔴 0 critical, 🟡 2 resolved, 🔵 4 resolved, ⚪ 2 open.
 
 **Overall:** Implementação sólida — todos os 🟡 resolvidos com commit `65c3485`. A maior lacuna restante são os **testes unitários** para os novos stores (🔵 #4).
 
@@ -136,11 +136,11 @@ data/
 | 4   | `ConversationStore` → `QueryManager` (persist on answer) | `query_user.ts`       | ✅     |
 | 5   | Wire all stores into `agent.ts` setup                    | `agent.ts`            | ✅     |
 
-### Previously: 🔵 #4 "Nenhum teste unitário para os 7 novos stores" → **Ainda aberto**
+### Previously: 🔵 #4 "Nenhum teste unitário para os 7 novos stores" → ✅ **Resolvido** (commit `021d3a3`)
 
 ## Final Verification
 
 - [x] `tsc --noEmit` — pass (0 errors)
-- [x] `npm test` — 29/29 pass
+- [x] `npm test` — 41/41 pass (29 orig + 12 novos)
 - [x] Planning card: `.github/handoff-cards/1-planning.md`
 - [x] 6 files changed, 198 insertions, 34 deletions
