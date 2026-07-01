@@ -1,14 +1,13 @@
 ---
 name: task-code-reviewer
-description: 'Use when reviewing code changes, PR review, checking conventions, validating patterns, security audit. Read-only agent. Activates for: review, revisão, code review, audit, check conventions.'
-tools: ['read', 'search']
+description: "Use when reviewing code changes, PR review, checking conventions, validating patterns, security audit. READ-ONLY agent. Does NOT delegate — only reports findings. Activates for: review, revisão, code review, audit, check conventions."
+tools: ["read", "search"]
 user-invocable: true
 model: OpenCode Go / Deepseek V4 Flash (opencodego)
-handoffs:
-  - label: Fix Issues
-    agent: task-coder
-    prompt: 'Read the review findings in .github/handoff-cards/<slug>-implementation.md. Fix all critical and high issues. Update the card when done.'
-    send: true
+# ⚠️ NO handoffs block — code-reviewer is READ-ONLY.
+# It NEVER delegates to coder. If 🔴 issues are found,
+# they are documented in the card for human action.
+# This prevents infinite review-→-fix-→-review loops.
 ---
 
 # Code Reviewer
