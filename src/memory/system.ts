@@ -16,7 +16,7 @@ import { ChromaVectorStore } from "./chroma-vector-store.js";
 import { KnowledgeGraph } from "./knowledge-graph.js";
 import { SceneContextStore } from "./scene-context-store.js";
 import { PersistentKnowledgeGraph } from "./kg-store.js";
-import { RoutineStore } from "./routine-store.js";
+import { PersistentRoutineStore } from "./routine-store.js";
 import { HypothesisStore } from "./hypothesis-store.js";
 import { ConversationStore } from "./conversation-store.js";
 import { ContextCompiler } from "./context-compiler.js";
@@ -149,7 +149,7 @@ export class MemorySystem {
   anomalyDetector: AnomalyDetector;
   knowledgeGraph: PersistentKnowledgeGraph;
   sceneContextStore: SceneContextStore;
-  routineStore: RoutineStore;
+  routineStore: PersistentRoutineStore;
   hypothesisStore: HypothesisStore;
   conversationStore: ConversationStore;
   contextCompiler: ContextCompiler;
@@ -168,7 +168,7 @@ export class MemorySystem {
     this.sceneContextStore = new SceneContextStore(
       `${dataDir}/scene-contexts.db`,
     );
-    this.routineStore = new RoutineStore(`${dataDir}/routines.db`);
+    this.routineStore = new PersistentRoutineStore(`${dataDir}/routines.db`);
     this.hypothesisStore = new HypothesisStore(`${dataDir}/hypotheses.db`);
     this.conversationStore = new ConversationStore(
       `${dataDir}/conversations.db`,

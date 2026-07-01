@@ -9,7 +9,7 @@
 import { logger } from "../core/logger.js";
 import type { SecurityEvent, PersonRecord } from "../core/types.js";
 import type { MemorySystem } from "./system.js";
-import type { RoutineStore } from "./routine-store.js";
+import type { PersistentRoutineStore } from "./routine-store.js";
 
 // ── Routine Profile ──────────────────────────────────────────────
 
@@ -48,7 +48,7 @@ export class RoutineLearner {
       atypicalThreshold?: number;
       minObservations?: number;
     },
-    private routineStore?: RoutineStore,
+    private routineStore?: PersistentRoutineStore,
   ) {
     this.learningRate = opts?.learningRate ?? 0.05;
     this.atypicalThreshold = opts?.atypicalThreshold ?? 0.15;

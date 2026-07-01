@@ -15,7 +15,7 @@ import {
   createDefaultSceneContext,
 } from "../scene-context-store.js";
 import { PersistentKnowledgeGraph } from "../kg-store.js";
-import { RoutineStore } from "../routine-store.js";
+import { PersistentRoutineStore } from "../routine-store.js";
 import { HypothesisStore } from "../hypothesis-store.js";
 import { ConversationStore } from "../conversation-store.js";
 
@@ -140,11 +140,11 @@ describe("PersistentKnowledgeGraph", () => {
   });
 });
 
-// ── RoutineStore ─────────────────────────────────────────────────
+// ── PersistentRoutineStore ───────────────────────────────────────────
 
-describe("RoutineStore", () => {
+describe("PersistentRoutineStore", () => {
   it("deve salvar e carregar um perfil de rotina", async () => {
-    const store = new RoutineStore(dbPath("routines.db"));
+    const store = new PersistentRoutineStore(dbPath("routines.db"));
 
     const profile = {
       entityId: "person:joao",

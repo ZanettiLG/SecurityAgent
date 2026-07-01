@@ -1,8 +1,10 @@
 /**
- * RoutineStore — Persistência de perfis de rotina (RoutineProfile) em SQLite.
+ * PersistentRoutineStore — Persistência de perfis de rotina (RoutineProfile) em SQLite.
  *
  * Integra-se ao RoutineLearner: toda mutação no perfil (updateProfile)
  * é espelhada no SQLite. No boot, carrega todos os profiles do banco.
+ *
+ * Alias backward: `RoutineStore` → `PersistentRoutineStore`.
  */
 
 import Database from "better-sqlite3";
@@ -86,7 +88,7 @@ function rowToProfile(row: Record<string, unknown>): RoutineProfile {
 
 // ── Store ────────────────────────────────────────────────────────
 
-export class RoutineStore {
+export class PersistentRoutineStore {
   private db: Database.Database;
   private upsertStmt: Database.Statement;
 
@@ -101,7 +103,7 @@ export class RoutineStore {
          typical_events, total_observations, days_of_data, last_updated)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    logger.info({ dbPath }, "RoutineStore opened");
+    logger.info({ dbPath }, "PersistentRoutineStore opened");
   }
 
   private initSchema(): void {
@@ -153,6 +155,6 @@ export class RoutineStore {
 
   close(): void {
     this.db.close();
-    logger.info("RoutineStore closed");
+    logger.info("PersistentRoutineStore closed");
   }
 }
