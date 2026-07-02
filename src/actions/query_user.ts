@@ -8,7 +8,11 @@ import type { ConversationStore } from "../memory/conversation-store.js";
 
 export type QuestionPriority = "low" | "medium" | "high" | "critical";
 export type QuestionStatus =
-  "pending" | "asked" | "answered" | "ignored" | "expired";
+  | "pending"
+  | "asked"
+  | "answered"
+  | "ignored"
+  | "expired";
 
 export interface Question {
   questionId: string;

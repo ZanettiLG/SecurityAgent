@@ -12,9 +12,17 @@ import type { SecurityEvent } from "../core/types.js";
 // ── Type Definitions ────────────────────────────────────────────
 
 export type NodeType =
-  "PERSON" | "VEHICLE" | "CAMERA" | "LOCATION" | "INCIDENT";
+  | "PERSON"
+  | "VEHICLE"
+  | "CAMERA"
+  | "LOCATION"
+  | "INCIDENT";
 export type EdgeType =
-  "VISITED_WITH" | "ASSOCIATED_WITH" | "SEEN_AT" | "ENTERED_THROUGH" | "OWNS";
+  | "VISITED_WITH"
+  | "ASSOCIATED_WITH"
+  | "SEEN_AT"
+  | "ENTERED_THROUGH"
+  | "OWNS";
 
 export interface GraphNode {
   id: string;

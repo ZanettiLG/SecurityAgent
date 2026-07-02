@@ -172,7 +172,8 @@ export class ContextCompiler {
         const entity = ctx.entity as Record<string, unknown>;
         lines.push(`Pessoa: ${String(entity.label ?? pid)}`);
         const neighbors = ctx.neighbors as
-          Array<Record<string, unknown>> | undefined;
+          | Array<Record<string, unknown>>
+          | undefined;
         if (neighbors && neighbors.length > 0) {
           lines.push("  Relacionamentos:");
           for (const neighbor of neighbors.slice(0, 5)) {
@@ -192,7 +193,8 @@ export class ContextCompiler {
         const entity = ctx.entity as Record<string, unknown>;
         lines.push(`Veículo: ${String(entity.label ?? vehicleId)}`);
         const neighbors = ctx.neighbors as
-          Array<Record<string, unknown>> | undefined;
+          | Array<Record<string, unknown>>
+          | undefined;
         if (neighbors && neighbors.length > 0) {
           lines.push("  Associado a:");
           for (const neighbor of neighbors) {

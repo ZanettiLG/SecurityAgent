@@ -96,13 +96,15 @@ export class LlmClient {
 
     // Add SceneContext if present
     const sceneCtx = context.sceneContext as
-      Record<string, unknown> | undefined;
+      | Record<string, unknown>
+      | undefined;
     if (sceneCtx) {
       enrichedLines.push("## Contexto de Cena");
       enrichedLines.push(`Local: ${sceneCtx.label ?? "N/A"}`);
       enrichedLines.push(`Descrição: ${sceneCtx.description ?? ""}`);
       const residents = sceneCtx.knownResidents as
-        Array<{ name: string; relationship: string }> | undefined;
+        | Array<{ name: string; relationship: string }>
+        | undefined;
       if (residents?.length) {
         enrichedLines.push(
           `Residentes: ${residents.map((r) => `${r.name} (${r.relationship})`).join(", ")}`,
@@ -113,7 +115,8 @@ export class LlmClient {
 
     // Add KG enrichment if present
     const kgCtx = event.payload.kgContext as
-      Record<string, unknown> | undefined;
+      | Record<string, unknown>
+      | undefined;
     if (kgCtx) {
       enrichedLines.push("## Knowledge Graph Context");
       for (const [entityId, entityCtx] of Object.entries(kgCtx)) {
@@ -124,7 +127,8 @@ export class LlmClient {
             `Entidade: ${entity.label as string} (${entity.type as string})`,
           );
           const neighbors = ctx.neighbors as
-            Array<Record<string, unknown>> | undefined;
+            | Array<Record<string, unknown>>
+            | undefined;
           if (neighbors?.length) {
             enrichedLines.push(
               `  Relacionamentos: ${neighbors.map((n) => `${n.label as string} (${n.type as string})`).join(", ")}`,
