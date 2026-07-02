@@ -1,6 +1,6 @@
 ---
 description: "Run the full test suite and report formatted results. Use when verifying changes."
-agent: test-runner
+agent: task-test-runner
 tools: ['execute', 'read']
 ---
 

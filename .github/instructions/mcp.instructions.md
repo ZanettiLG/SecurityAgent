@@ -1,9 +1,9 @@
 ---
 description: 'Use when crafting prompts, selecting tools, or troubleshooting MCP server issues. Covers all MCP servers (github, playwright, sequential-thinking, fetch, context7, minio, docker) — what they do, when to invoke them, and Gotchas.'
-applyTo: ['.vscode/mcp.json', 'docker-compose.yml']
+applyTo: '.vscode/mcp.json', 'docker-compose.yml'
 ---
 
-# MCP Servers (Audiobooker Harness)
+# MCP Servers (project Harness)
 
 This project uses 7 MCP servers to extend Copilot capabilities. 3 run locally via `npx` stdio (defined in `.vscode/mcp.json`), and 4 run as Docker services (defined in `docker-compose.yml`). Additionally, the **GitHub MCP** is available via the VS Code GitHub integration.
 
@@ -28,7 +28,7 @@ This project uses 7 MCP servers to extend Copilot capabilities. 3 run locally vi
   | `mcp_github_mcp_se_pull_request_review_write` | Create/submit/delete PR reviews |
   | `mcp_github_mcp_se_get_copilot_job_status` | Check Copilot coding agent job status |
   | `mcp_github_mcp_se_request_copilot_review` | Request Copilot code review on a PR |
-- **Gotcha**: Always use `owner: "ZanettiLG"` and `repo: "Audiobooker"`. For file operations, specify the branch explicitly.
+- **Gotcha**: Always use `owner: "ZanettiLG"` and `repo: "project"`. For file operations, specify the branch explicitly.
 
 ### Image Upload via GitHub MCP
 
@@ -37,14 +37,14 @@ To embed images in GitHub Issues (handoff cards, research evidence):
 ```
 1. Capture screenshot (via Playwright MCP or other tool)
 2. mcp_github_mcp_se_create_or_update_file(
-     owner: "ZanettiLG", repo: "Audiobooker",
+     owner: "ZanettiLG", repo: "project",
      branch: "feat/my-feature",
      path: "docs/screenshots/<slug>-<phase>-<desc>.png",
      content: "<base64-encoded-image>",
      message: "docs: add screenshot for <description>"
    )
 3. Reference in issue body:
-   ![description](https://raw.githubusercontent.com/ZanettiLG/Audiobooker/<branch>/docs/screenshots/<file>.png)
+   ![description](https://raw.githubusercontent.com/ZanettiLG/project/<branch>/docs/screenshots/<file>.png)
 ```
 
 **Conventions:**
@@ -66,11 +66,11 @@ To embed images in GitHub Issues (handoff cards, research evidence):
 ### minio — Storage Operations
 
 - **Package**: `mcp-minio` v1.0.7
-- **Purpose**: CRUD on the Audiobooker bucket (projects metadata, markdown files)
+- **Purpose**: CRUD on the project bucket (projects metadata, markdown files)
 - **When to use**: Debugging storage issues, inspecting project JSON, verifying uploaded files
 - **Tools**: `listBuckets`, `listFiles`, `getFileContent`, `uploadFile`, `createBucket`, `getFileUrl`
-- **Env vars**: `MINIO_ENDPOINT=localhost`, `MINIO_PORT=9000`, `MINIO_SSL=false`, `MINIO_ACCESS_KEY=audiobooker`, `MINIO_SECRET_KEY=audiobooker-secret-change-me`
-- **Gotcha**: Connects via env vars only — no CLI flags supported. Bucket is `audiobooker`.
+- **Env vars**: `MINIO_ENDPOINT=localhost`, `MINIO_PORT=9000`, `MINIO_SSL=false`, `MINIO_ACCESS_KEY=project`, `MINIO_SECRET_KEY=project-secret-change-me`
+- **Gotcha**: Connects via env vars only — no CLI flags supported. Bucket is `project`.
 
 ### docker — Container Management
 
@@ -124,7 +124,7 @@ To embed images in GitHub Issues (handoff cards, research evidence):
 | "Upload a screenshot for the handoff card" | → **github** (`create_or_update_file`)        |
 | "Create a PR for my changes"               | → **github** (`create_pull_request`)          |
 | "How do I use MUI's Autocomplete?"         | → **mui**                                     |
-| "What's in the audiobooker bucket?"        | → **minio**                                   |
+| "What's in the project bucket?"        | → **minio**                                   |
 | "Are my Docker containers healthy?"        | → **docker**                                  |
 | "Take a screenshot of the editor page"     | → **playwright** (then **github** for upload) |
 | "Test the frontend login flow"             | → **playwright**                              |

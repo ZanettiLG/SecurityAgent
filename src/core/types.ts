@@ -13,7 +13,8 @@ export const PersonCategory = {
   FREQUENT_UNKNOWN: "frequent_unknown",
   THREAT: "threat",
 } as const;
-export type PersonCategory = (typeof PersonCategory)[keyof typeof PersonCategory];
+export type PersonCategory =
+  (typeof PersonCategory)[keyof typeof PersonCategory];
 
 export const EventType = {
   // Pessoas
@@ -42,6 +43,8 @@ export const EventType = {
   INVESTIGATION_RESULT: "investigation_result",
   PREDICTION_MADE: "prediction_made",
   PREDICTION_VERIFIED: "prediction_verified",
+  // Cena Semântica (Vigia)
+  SCENE_OBSERVATION: "scene_observation",
 } as const;
 export type EventType = (typeof EventType)[keyof typeof EventType];
 
@@ -102,6 +105,60 @@ export interface PersonRecord {
   metadata: Record<string, unknown>;
 }
 
+// ── Scene Observation (Vigia — Análise Semântica de Cena) ───────
+
+/** Observação completa de uma cena — envelope com metadados + descrição rica */
+export interface SceneObservation {
+  id: string;
+  timestamp: Date;
+  cameraId: string;
+  snapshotPath: string;
+  description: SceneDescription;
+  /** Embedding da narração para busca semântica (ChromaDB) */
+  textEmbedding?: number[];
+}
+
+/** Descrição rica da cena gerada por LLM Vision */
+export interface SceneDescription {
+  /** Descrição completa em texto corrido (português) */
+  narration: string;
+  persons: PersonObservation[];
+  vehicles: VehicleObservation[];
+  objects: ObjectObservation[];
+  actions: string[];
+  intentions: string[];
+  anomalyFlags: string[];
+}
+
+/** Observação visual pontual de uma pessoa na cena */
+export interface PersonObservation {
+  localId: string;
+  /** ID da pessoa no PersonRegistry, se reconhecida */
+  personId?: string;
+  appearance: {
+    estimatedAge?: string;
+    clothing: string;
+    accessories: string[];
+    height?: string;
+  };
+  movement?: string;
+  appearsKnown: boolean;
+}
+
+/** Observação visual de um veículo na cena */
+export interface VehicleObservation {
+  type: string;
+  color: string;
+  plate?: string;
+  parkedMinutes?: number;
+}
+
+/** Objeto relevante detectado na cena */
+export interface ObjectObservation {
+  type: string;
+  relevance: "normal" | "suspicious" | "threat";
+}
+
 // ── World State ──────────────────────────────────────────────────
 
 export type FactValue = string | number | boolean;
@@ -122,16 +179,20 @@ export class WorldState {
 
         switch (op) {
           case ">":
-            if (!(typeof current === "number" && current > numVal)) return false;
+            if (!(typeof current === "number" && current > numVal))
+              return false;
             break;
           case "<":
-            if (!(typeof current === "number" && current < numVal)) return false;
+            if (!(typeof current === "number" && current < numVal))
+              return false;
             break;
           case ">=":
-            if (!(typeof current === "number" && current >= numVal)) return false;
+            if (!(typeof current === "number" && current >= numVal))
+              return false;
             break;
           case "<=":
-            if (!(typeof current === "number" && current <= numVal)) return false;
+            if (!(typeof current === "number" && current <= numVal))
+              return false;
             break;
           case "==":
             if (current !== val) return false;
@@ -152,7 +213,8 @@ export class WorldState {
     for (const [key, value] of Object.entries(effects)) {
       if (Array.isArray(value)) {
         const [op, val] = value;
-        const current = typeof newFacts[key] === "number" ? (newFacts[key] as number) : 0;
+        const current =
+          typeof newFacts[key] === "number" ? (newFacts[key] as number) : 0;
         const numVal = typeof val === "number" ? val : 0;
 
         if (op === "+") newFacts[key] = current + numVal;
@@ -199,7 +261,9 @@ export class WorldState {
 
 let _eventCounter = 0;
 
-export function createEvent(partial: Partial<SecurityEvent> & { eventType: EventType }): SecurityEvent {
+export function createEvent(
+  partial: Partial<SecurityEvent> & { eventType: EventType },
+): SecurityEvent {
   _eventCounter++;
   return {
     eventId: `evt_${Date.now()}_${_eventCounter}`,

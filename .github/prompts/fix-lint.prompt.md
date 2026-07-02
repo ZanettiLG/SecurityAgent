@@ -1,6 +1,6 @@
 ---
 description: 'Auto-fix ESLint and Prettier issues on modified files. Use when lint or format errors are reported.'
-agent: coder
+agent: task-coder
 tools: ['execute', 'read']
 ---
 

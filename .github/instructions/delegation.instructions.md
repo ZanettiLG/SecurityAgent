@@ -1,5 +1,5 @@
 ---
-description: 'Regras de delegação hierárquica e segregação de contexto para TODOS os agentes do harness Audiobooker. Ativa quando qualquer agente precisar delegar sub-tarefas ou for invocado como subagente.'
+description: 'Regras de delegação hierárquica e segregação de contexto para TODOS os agentes do harness project. Ativa quando qualquer agente precisar delegar sub-tarefas ou for invocado como subagente.'
 ---
 
 # Delegação Hierárquica & Segregação de Contexto

@@ -83,6 +83,15 @@ const VigiaConfig = z.object({
         .default("informative"),
     })
     .default({}),
+  sceneAnalyzer: z
+    .object({
+      enabled: z.boolean().default(true),
+      minIntervalMs: z.number().default(5000),
+      motionThreshold: z.number().default(0.05),
+      maxTokens: z.number().default(300),
+      model: z.string().optional(),
+    })
+    .default({}),
 });
 
 const LlmConfig = z.object({
@@ -123,6 +132,7 @@ export type AppConfig = z.infer<typeof AppConfigSchema>;
 export type CameraConfig = z.infer<typeof CameraConfig>;
 export type VigiaConfig = z.infer<typeof VigiaConfig>;
 export type LlmConfig = z.infer<typeof LlmConfig>;
+export type SceneAnalyzerConfig = z.infer<typeof VigiaConfig>["sceneAnalyzer"];
 
 // ── Load ──
 
@@ -137,10 +147,32 @@ export function loadConfig(path?: string): AppConfig {
 
   // Substitui ${VAR_NAME} por process.env.VAR_NAME
   raw = raw.replace(/\$\{([^}]+)\}/g, (_, varName) => {
-    return process.env[varName.trim()] ?? "";
+    const name = varName.trim();
+    const value = process.env[name];
+    if (!value) {
+      logger.warn(
+        { varName: name },
+        "Environment variable not set — camera may be disabled",
+      );
+    }
+    return value ?? "";
   });
 
   const parsed = parseYaml(raw);
+
+  // Valida e desabilita câmeras com credenciais RTSP vazias
+  if (Array.isArray(parsed?.cameras)) {
+    for (const cam of parsed.cameras as Array<Record<string, unknown>>) {
+      const source = String(cam.source ?? "");
+      if (/rtsp:\/\/:/.test(source) || /rtsp:\/\/[^:]*:@/.test(source)) {
+        logger.warn(
+          { cameraId: cam.id, source },
+          "Camera has empty credentials — disabling",
+        );
+        cam.enabled = false;
+      }
+    }
+  }
 
   const result = AppConfigSchema.safeParse(parsed);
   if (!result.success) {

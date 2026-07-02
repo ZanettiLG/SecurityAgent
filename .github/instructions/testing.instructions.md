@@ -1,6 +1,6 @@
 ---
 description: "Use when writing tests with Vitest. Covers test structure, mocks, assertions, and baseline expectations."
-applyTo: ["**/*.test.ts", "**/__tests__/**"]
+applyTo: "**/*.test.ts", "**/__tests__/**"
 ---
 
 # Testing Conventions (Audiobooker)

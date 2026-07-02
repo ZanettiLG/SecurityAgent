@@ -53,6 +53,8 @@ import {
 } from "../perception/camera-connector.js";
 import { KnowledgeGraph } from "../memory/knowledge-graph.js";
 import { SocialMediaInvestigator } from "../processing/social-investigator.js";
+import { SceneAnalyzer } from "../processing/scene-analyzer.js";
+import { AudioPipeline } from "../processing/audio-pipeline.js";
 
 // ── Agent ────────────────────────────────────────────────────────
 
@@ -66,7 +68,7 @@ export class SecurityAgent {
   bus = new EventBus();
   cameras: CameraConnector[] = [];
   visionPipeline: VisionPipeline | null = null;
-  audioPipeline: unknown = null;
+  audioPipeline: AudioPipeline | null = null;
   memory: MemorySystem | null = null;
   goapPlanner: GoapAgent | null = null;
   rulesEngine: RulesEngine | null = null;
@@ -78,6 +80,7 @@ export class SecurityAgent {
   routineLearner: RoutineLearner | null = null;
   patternMiner: PatternMiner | null = null;
   hypothesisEngine: HypothesisEngine | null = null;
+  sceneAnalyzer: SceneAnalyzer | null = null;
   socialInvestigator: SocialMediaInvestigator | null = null;
   socialPredictor: SocialPredictionEngine | null = null;
   queryManager: QueryManager | null = null;
@@ -124,6 +127,7 @@ export class SecurityAgent {
     await this.memory.initialize();
 
     this.visionPipeline = new VisionPipeline(this.bus, this.memory);
+    this.audioPipeline = new AudioPipeline(this.bus);
     this.llmClient = new LlmClient({
       apiKey: this.config.llm.apiKey,
       baseUrl: this.config.llm.baseUrl,
@@ -150,6 +154,11 @@ export class SecurityAgent {
     });
     this.patternMiner = new PatternMiner(this.memory, this.routineLearner);
     this.hypothesisEngine = new HypothesisEngine(this.llmClient, this.memory);
+    this.sceneAnalyzer = new SceneAnalyzer(
+      this.llmClient,
+      this.bus,
+      this.config.vigia.sceneAnalyzer,
+    );
     this.behaviorMatcher = new BehavioralPatternMatcher();
     this.queryManager = new QueryManager(this.bus);
     this.knowledgeGraph = new KnowledgeGraph();
@@ -521,6 +530,13 @@ export class SecurityAgent {
             for (const ve of vehicleEvents) {
               this.bus.publish("vision.event", ve);
             }
+          }
+          // Scene semantic analysis (assíncrono — não bloqueia)
+          if (this.sceneAnalyzer && event) {
+            void this.sceneAnalyzer.analyze(
+              frame,
+              event.payload.changeRatio as number | undefined,
+            );
           }
         }
       } catch (err) {

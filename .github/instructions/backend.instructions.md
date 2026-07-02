@@ -1,9 +1,8 @@
 ---
 description: "Use when working on backend routes, services, middleware, pipeline, or API code. Covers DI pattern, controller+validate, ESM .js, error hierarchy, and route auto-discovery."
-applyTo: "backend/src/**"
 ---
 
-# Backend Conventions (Audiobooker)
+# Backend Conventions (project)
 
 ## Route Pattern
 

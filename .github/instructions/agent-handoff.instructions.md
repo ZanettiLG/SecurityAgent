@@ -1,3 +1,7 @@
+---
+description: "This file describes the agent handoff protocol for the project monorepo. It defines how agents communicate, delegate tasks, and maintain a clean context across research, planning, implementation, code review, and testing phases."
+---
+
 # Agent Handoff Protocol
 
 > **Applies to:** All agents in the handoff pipeline (`orchestrator`, `researcher`, `planner`, `coder`, `code-reviewer`, `test-runner`)
@@ -93,7 +97,7 @@ Handoff cards support embedded images and screenshots. This is critical for visu
    - Path: `docs/screenshots/<slug>-<phase>-<description>.png`
    - Branch: current working branch (e.g., `feat/my-feature`)
    - Content: base64-encoded image data
-3. **Get raw URL**: `https://raw.githubusercontent.com/ZanettiLG/Audiobooker/<branch>/docs/screenshots/<filename>`
+3. **Get raw URL**: `https://raw.githubusercontent.com/ZanettiLG/project/<branch>/docs/screenshots/<filename>`
 4. **Embed in issue body**: `![description](<raw_url>)`
 
 ### Example: Embedding a Screenshot in a Research Card
@@ -101,7 +105,7 @@ Handoff cards support embedded images and screenshots. This is critical for visu
 ```markdown
 ## UI Screenshot (Current State)
 
-![current-editor](https://raw.githubusercontent.com/ZanettiLG/Audiobooker/feat/my-feature/docs/screenshots/my-feature-research-editor.png)
+![current-editor](https://raw.githubusercontent.com/ZanettiLG/project/feat/my-feature/docs/screenshots/my-feature-research-editor.png)
 
 The editor page currently lacks the batch upload area.
 ```
@@ -122,13 +126,13 @@ When the researcher or planner needs browser screenshots:
 1. open_browser_page(url) → pageId
 2. screenshot_page(pageId, element="...") → base64 image
 3. mcp_github_mcp_se_create_or_update_file(
-     owner="ZanettiLG", repo="Audiobooker",
+     owner="ZanettiLG", repo="project",
      branch="feat/my-feature",
      path="docs/screenshots/my-feature-research-ui.png",
      content="<base64-encoded-png>",
      message="docs: add research screenshot for my-feature"
    )
-4. Embed in issue body: ![UI Screenshot](https://raw.githubusercontent.com/ZanettiLG/Audiobooker/feat/my-feature/docs/screenshots/my-feature-research-ui.png)
+4. Embed in issue body: ![UI Screenshot](https://raw.githubusercontent.com/ZanettiLG/project/feat/my-feature/docs/screenshots/my-feature-research-ui.png)
 ```
 
 ## Handoff Contract Rules
@@ -171,7 +175,7 @@ Every handoff card (research, planning, implementation) MUST end with a **Handof
    ```
    mcp_github_mcp_se_issue_write(
      method: "create",
-     owner: "ZanettiLG", repo: "Audiobooker",
+     owner: "ZanettiLG", repo: "project",
      title: "[Feature] X",
      body: "Feature description + acceptance criteria",
      labels: ["type:epic"]
@@ -239,7 +243,7 @@ The coder auto-delegates to code-reviewer via `handoffs` (`send: true`):
 ```
 runSubagent(
   agentName = "code-reviewer",
-  prompt = "Read the Implementation Card at .github/handoff-cards/<slug>-implementation.md. Review the changes against Audiobooker conventions. Append review findings to the same card.",
+  prompt = "Read the Implementation Card at .github/handoff-cards/<slug>-implementation.md. Review the changes against project conventions. Append review findings to the same card.",
   description = "Code review for <feature name>"
 )
 ```
@@ -315,7 +319,7 @@ Then create the PR via `mcp_github_mcp_se_create_pull_request`:
 
 ```
 mcp_github_mcp_se_create_pull_request(
-  owner: "ZanettiLG", repo: "Audiobooker",
+  owner: "ZanettiLG", repo: "project",
   title: "feat: <feature description>",
   head: "feature/<slug>",
   base: "master"  // or "develop" from user choice
@@ -356,7 +360,7 @@ All agents use `mcp_github_mcp_se_issue_write` to write/update sub-issues:
 ```
 mcp_github_mcp_se_issue_write(
   method: "update",  // or "create" for new sub-issues
-  owner: "ZanettiLG", repo: "Audiobooker",
+  owner: "ZanettiLG", repo: "project",
   issue_number: <sub-issue number>,
   body: "<full card body in Markdown>",
   labels: ["agent:<phase>", "status:needs-review"]
@@ -369,7 +373,7 @@ Agents can include screenshots captured via Playwright MCP:
 
 1. Capture via `screenshot_page(pageId)` or `browser_snapshot`
 2. Upload via `mcp_github_mcp_se_create_or_update_file` to `docs/screenshots/`
-3. Embed in issue body: `![description](https://raw.githubusercontent.com/ZanettiLG/Audiobooker/<branch>/docs/screenshots/<file>.png)`
+3. Embed in issue body: `![description](https://raw.githubusercontent.com/ZanettiLG/project/<branch>/docs/screenshots/<file>.png)`
 
 ## Handoff Card Templates
 
@@ -386,7 +390,7 @@ Agents can include screenshots captured via Playwright MCP:
 
 <!-- Embed screenshots captured during research -->
 
-![current-state](https://raw.githubusercontent.com/ZanettiLG/Audiobooker/<branch>/docs/screenshots/<slug>-research-<desc>.png)
+![current-state](https://raw.githubusercontent.com/ZanettiLG/project/<branch>/docs/screenshots/<slug>-research-<desc>.png)
 
 ## Codebase Exploration
 
@@ -446,7 +450,7 @@ Agents can include screenshots captured via Playwright MCP:
 
 <!-- Optional: architecture diagram -->
 
-![architecture](https://raw.githubusercontent.com/ZanettiLG/Audiobooker/<branch>/docs/screenshots/<slug>-planning-arch.png)
+![architecture](https://raw.githubusercontent.com/ZanettiLG/project/<branch>/docs/screenshots/<slug>-planning-arch.png)
 
 ## Tasks (ordered by dependency)
 
@@ -506,7 +510,7 @@ Agents can include screenshots captured via Playwright MCP:
 
 <!-- Embed before/after screenshots if UI changes -->
 
-![after-change](https://raw.githubusercontent.com/ZanettiLG/Audiobooker/<branch>/docs/screenshots/<slug>-implementation-<desc>.png)
+![after-change](https://raw.githubusercontent.com/ZanettiLG/project/<branch>/docs/screenshots/<slug>-implementation-<desc>.png)
 
 ## Tests Added
 

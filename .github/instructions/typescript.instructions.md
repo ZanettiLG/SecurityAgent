@@ -1,6 +1,6 @@
 ---
 description: "Use when writing TypeScript code. Covers strict mode, type safety, ESM imports, and zod validation."
-applyTo: ["**/*.ts", "**/*.tsx"]
+applyTo: "**/*.ts", "**/*.tsx"
 ---
 
 # TypeScript Conventions (Audiobooker)

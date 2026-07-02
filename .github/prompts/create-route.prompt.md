@@ -1,6 +1,6 @@
 ---
 description: "Scaffold a new Express API route following the Controller + Validate pattern. Use when creating a new endpoint."
-agent: coder
+agent: task-coder
 tools: ['read', 'edit', 'search']
 ---
 
