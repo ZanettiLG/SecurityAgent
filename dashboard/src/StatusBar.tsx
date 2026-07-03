@@ -20,9 +20,9 @@ function StatusBar({
       >
         {connected ? "🟢" : "🔴"} {connected ? "Conectado" : "Desconectado"}
       </span>
-      <span className="status-bar__item">📷 {camerasOnline}/2 câmeras</span>
       <span className="status-bar__item">⚠️ {threats} ameaças</span>
       <span className="status-bar__item">📊 {eventsCount} eventos hoje</span>
+      <span className="status-bar__item">📷 {camerasOnline}/2 câmeras</span>
       <span className="status-bar__model">🧠 MiniCPM-V 4.6</span>
     </footer>
   );

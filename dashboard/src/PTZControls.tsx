@@ -76,10 +76,65 @@ export default function PTZControls({ cameraId, visible, onClose }: Props) {
       ? { background: "#2563eb", borderColor: "#3b82f6" }
       : undefined;
 
+  // ── Keyboard navigation handler ──
+  const handleKeyMove = useCallback(
+    (e: React.KeyboardEvent, dir: string, pan: number, tilt: number) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        startMove(dir, pan, tilt);
+      }
+      // Arrow keys for PTZ
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        startMove("left", -1, 0);
+      }
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        startMove("right", 1, 0);
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        startMove("up", 0, 1);
+      }
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        startMove("down", 0, -1);
+      }
+    },
+    [startMove],
+  );
+
+  const handleKeyStop = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " " || e.key === "Escape") {
+        e.preventDefault();
+        stopMove();
+      }
+    },
+    [stopMove],
+  );
+
   // ── Mobile: horizontal bottom-sheet layout ──
   if (isMobile) {
     return (
-      <div className="ptz-controls--mobile" onTouchEnd={stopMove}>
+      <div
+        className="ptz-controls--mobile"
+        onTouchEnd={stopMove}
+        onKeyDown={handleKeyStop}
+        onKeyUp={(e) => {
+          if (
+            [
+              "ArrowLeft",
+              "ArrowRight",
+              "ArrowUp",
+              "ArrowDown",
+              "Enter",
+              " ",
+            ].includes(e.key)
+          )
+            stopMove();
+        }}
+      >
         <button
           type="button"
           onClick={onClose}
@@ -98,7 +153,10 @@ export default function PTZControls({ cameraId, visible, onClose }: Props) {
             onMouseUp={stopMove}
             onTouchStart={() => startMove("left", -1, 0)}
             onTouchEnd={stopMove}
+            onKeyDown={(e) => handleKeyMove(e, "left", -1, 0)}
+            onKeyUp={stopMove}
             aria-label="Pan Left"
+            tabIndex={0}
           >
             ◀
           </button>
@@ -110,7 +168,10 @@ export default function PTZControls({ cameraId, visible, onClose }: Props) {
             onMouseUp={stopMove}
             onTouchStart={() => startMove("up", 0, 1)}
             onTouchEnd={stopMove}
+            onKeyDown={(e) => handleKeyMove(e, "up", 0, 1)}
+            onKeyUp={stopMove}
             aria-label="Tilt Up"
+            tabIndex={0}
           >
             ▲
           </button>
@@ -118,6 +179,7 @@ export default function PTZControls({ cameraId, visible, onClose }: Props) {
             type="button"
             className="ptz-controls__btn ptz-controls__btn--stop"
             onClick={stopMove}
+            onKeyDown={handleKeyStop}
             aria-label="Parar movimento"
           >
             ■
@@ -130,7 +192,10 @@ export default function PTZControls({ cameraId, visible, onClose }: Props) {
             onMouseUp={stopMove}
             onTouchStart={() => startMove("down", 0, -1)}
             onTouchEnd={stopMove}
+            onKeyDown={(e) => handleKeyMove(e, "down", 0, -1)}
+            onKeyUp={stopMove}
             aria-label="Tilt Down"
+            tabIndex={0}
           >
             ▼
           </button>
@@ -142,7 +207,10 @@ export default function PTZControls({ cameraId, visible, onClose }: Props) {
             onMouseUp={stopMove}
             onTouchStart={() => startMove("right", 1, 0)}
             onTouchEnd={stopMove}
+            onKeyDown={(e) => handleKeyMove(e, "right", 1, 0)}
+            onKeyUp={stopMove}
             aria-label="Pan Right"
+            tabIndex={0}
           >
             ▶
           </button>
@@ -186,6 +254,20 @@ export default function PTZControls({ cameraId, visible, onClose }: Props) {
       aria-label="Controles PTZ da câmera"
       onMouseLeave={stopMove}
       onTouchEnd={stopMove}
+      onKeyDown={handleKeyStop}
+      onKeyUp={(e) => {
+        if (
+          [
+            "ArrowLeft",
+            "ArrowRight",
+            "ArrowUp",
+            "ArrowDown",
+            "Enter",
+            " ",
+          ].includes(e.key)
+        )
+          stopMove();
+      }}
     >
       <button
         type="button"
@@ -206,7 +288,10 @@ export default function PTZControls({ cameraId, visible, onClose }: Props) {
           onMouseUp={stopMove}
           onTouchStart={() => startMove("up", 0, 1)}
           onTouchEnd={stopMove}
+          onKeyDown={(e) => handleKeyMove(e, "up", 0, 1)}
+          onKeyUp={stopMove}
           aria-label="Tilt Up"
+          tabIndex={0}
         >
           ▲
         </button>
@@ -220,7 +305,10 @@ export default function PTZControls({ cameraId, visible, onClose }: Props) {
           onMouseUp={stopMove}
           onTouchStart={() => startMove("left", -1, 0)}
           onTouchEnd={stopMove}
+          onKeyDown={(e) => handleKeyMove(e, "left", -1, 0)}
+          onKeyUp={stopMove}
           aria-label="Pan Left"
+          tabIndex={0}
         >
           ◀
         </button>
@@ -228,6 +316,7 @@ export default function PTZControls({ cameraId, visible, onClose }: Props) {
           type="button"
           className="ptz-controls__btn ptz-controls__btn--stop"
           onClick={stopMove}
+          onKeyDown={handleKeyStop}
           aria-label="Parar movimento"
         >
           ■
@@ -240,7 +329,10 @@ export default function PTZControls({ cameraId, visible, onClose }: Props) {
           onMouseUp={stopMove}
           onTouchStart={() => startMove("right", 1, 0)}
           onTouchEnd={stopMove}
+          onKeyDown={(e) => handleKeyMove(e, "right", 1, 0)}
+          onKeyUp={stopMove}
           aria-label="Pan Right"
+          tabIndex={0}
         >
           ▶
         </button>
@@ -254,7 +346,10 @@ export default function PTZControls({ cameraId, visible, onClose }: Props) {
           onMouseUp={stopMove}
           onTouchStart={() => startMove("down", 0, -1)}
           onTouchEnd={stopMove}
+          onKeyDown={(e) => handleKeyMove(e, "down", 0, -1)}
+          onKeyUp={stopMove}
           aria-label="Tilt Down"
+          tabIndex={0}
         >
           ▼
         </button>

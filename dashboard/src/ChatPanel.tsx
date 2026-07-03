@@ -147,7 +147,11 @@ function ChatPanel({
                   {alert.description}
                 </div>
                 <div className="chat-panel__alert-meta">
-                  📷 {alert.cameraId} · {alert.timestamp.toLocaleTimeString()}
+                  📷 {alert.cameraId} ·{" "}
+                  {new Intl.DateTimeFormat("pt-BR", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  }).format(alert.timestamp)}
                 </div>
               </div>
               <span className="chat-panel__alert-cta">Identificar →</span>
@@ -195,7 +199,10 @@ function ChatPanel({
               }
             >
               <div className="chat-panel__msg-time">
-                {msg.timestamp.toLocaleTimeString()}
+                {new Intl.DateTimeFormat("pt-BR", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                }).format(msg.timestamp)}
                 {msg.cameraId && (
                   <span className="chat-panel__msg-camera">
                     📷 {msg.cameraId}

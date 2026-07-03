@@ -74,6 +74,7 @@ function App() {
     cameraId: string;
     snapshotPath?: string;
     description: string;
+    eventTimestamp?: Date;
   } | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const lastEventRef = useRef<Map<string, number>>(new Map());
@@ -406,6 +407,7 @@ function App() {
                   cameraId: alert.cameraId,
                   snapshotPath: alert.snapshotPath,
                   description: alert.description,
+                  eventTimestamp: alert.timestamp,
                 });
               }
             }}
@@ -453,6 +455,7 @@ function App() {
                   cameraId: alert.cameraId,
                   snapshotPath: alert.snapshotPath,
                   description: alert.description,
+                  eventTimestamp: alert.timestamp,
                 });
               }
             }}
@@ -474,6 +477,7 @@ function App() {
           cameraId={identifyVehicle.cameraId}
           snapshotPath={identifyVehicle.snapshotPath}
           description={identifyVehicle.description}
+          eventTimestamp={identifyVehicle.eventTimestamp}
           onIdentify={handleIdentify}
           onClose={() => setIdentifyVehicle(null)}
         />
