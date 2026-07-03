@@ -4,6 +4,7 @@ import ChatPanel from "./ChatPanel";
 import Timeline from "./Timeline";
 import StatusBar from "./StatusBar";
 import VehicleIdentifyModal from "./VehicleIdentifyModal";
+import { useBreakpoint } from "./lib/useBreakpoint";
 
 // ── Types ──
 
@@ -76,6 +77,41 @@ function App() {
   } | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const lastEventRef = useRef<Map<string, number>>(new Map());
+  const bp = useBreakpoint();
+  const [sidebarOpen, setSidebarOpen] = useState(bp === "desktop");
+  const [camerasOnline, setCamerasOnline] = useState(0);
+
+  // Poll camera status for StatusBar
+  useEffect(() => {
+    let mounted = true;
+    const poll = async () => {
+      try {
+        const res = await fetch("/api/cameras");
+        if (res.ok) {
+          const data = await res.json();
+          if (mounted && Array.isArray(data)) {
+            const online = data.filter(
+              (c: { online?: boolean }) => c.online,
+            ).length;
+            setCamerasOnline(online);
+          }
+        }
+      } catch {
+        /* API offline */
+      }
+    };
+    poll();
+    const interval = setInterval(poll, 10000);
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Auto-open sidebar on desktop, close on mobile by default
+  useEffect(() => {
+    setSidebarOpen(bp === "desktop");
+  }, [bp]);
 
   // Group motion events into summaries instead of flooding chat
   const handleMotionEvent = useCallback(
@@ -344,6 +380,9 @@ function App() {
   // Aggregate motion summary for display
   const motionEntries = Array.from(motionSummary.values());
 
+  // Derived metrics
+  const threatCount = activeAlerts.filter((a) => a.severity >= 4).length;
+
   return (
     <div className="app">
       <header className="app__header">
@@ -371,8 +410,35 @@ function App() {
               }
             }}
           />
+          {/* FAB to toggle sidebar on mobile */}
+          {bp !== "desktop" && (
+            <button
+              type="button"
+              className="app__sidebar-toggle"
+              onClick={() => setSidebarOpen((v) => !v)}
+              aria-label={sidebarOpen ? "Fechar chat" : "Abrir chat"}
+            >
+              {sidebarOpen ? "✕" : "💬"}
+              {activeAlerts.length > 0 && !sidebarOpen && (
+                <span className="app__sidebar-toggle-badge">
+                  {activeAlerts.length > 9 ? "9+" : activeAlerts.length}
+                </span>
+              )}
+            </button>
+          )}
         </div>
-        <div className="app__sidebar">
+        <div
+          className={`app__sidebar${sidebarOpen ? " app__sidebar--open" : ""}`}
+        >
+          {/* Drag handle for bottom sheet */}
+          {bp !== "desktop" && (
+            <div
+              className="app__sidebar-handle"
+              onClick={() => setSidebarOpen((v) => !v)}
+              role="button"
+              aria-label={sidebarOpen ? "Recolher painel" : "Expandir painel"}
+            />
+          )}
           <ChatPanel
             messages={messages}
             connected={connected}
@@ -399,8 +465,8 @@ function App() {
       <StatusBar
         connected={connected}
         eventsCount={events.length}
-        camerasOnline={1}
-        threats={0}
+        camerasOnline={camerasOnline}
+        threats={threatCount}
       />
 
       {identifyVehicle && (
