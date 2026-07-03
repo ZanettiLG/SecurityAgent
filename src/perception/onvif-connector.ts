@@ -14,6 +14,7 @@
 
 import type { CameraConfig } from "../core/config.js";
 import { logger } from "../core/logger.js";
+import { createHash } from "node:crypto";
 import type { CameraConnector, CameraFrame } from "./camera-connector.js";
 import onvif from "onvif";
 
@@ -127,9 +128,40 @@ export class OnvifConnector implements CameraConnector, OnvifPTZ {
       useWSSecurity: this._useWSSecurity,
     });
 
+    // Patch _passwordDigest: the onvif library uses process.uptime() instead
+    // of Date.now() for the WS-Security timestamp, which produces dates in
+    // January 1970 when connect() is skipped (consumer cameras don't implement
+    // getSystemDateAndTime). This causes the camera to reject WS-Security auth.
+    if (this._useWSSecurity) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const origPasswordDigest = (cam as any)._passwordDigest.bind(cam);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (cam as any)._passwordDigest = function (this: onvif.Cam) {
+        const result = origPasswordDigest();
+        const now = new Date();
+        const nonceBytes = Buffer.from(result.nonce, "base64");
+        const cryptoDigest = createHash("sha1");
+        cryptoDigest.update(
+          Buffer.concat([
+            nonceBytes,
+            Buffer.from(now.toISOString(), "ascii"),
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            Buffer.from((this as any).password ?? "", "ascii"),
+          ]),
+        );
+        return {
+          passdigest: cryptoDigest.digest("base64"),
+          nonce: result.nonce,
+          timestamp: now.toISOString(),
+        };
+      };
+    }
+
     // Inject Basic auth header for cameras that don't return proper 401
     // (e.g. Yoosee hangs without authentication).
-    if (this.username && this.password) {
+    // SKIP for WS-Security cameras — Intelbras uses WS-Security which handles
+    // auth at the SOAP level; injecting a Basic header causes conflicts.
+    if (!this._useWSSecurity && this.username && this.password) {
       const basicAuth = `Basic ${Buffer.from(`${this.username}:${this.password}`).toString("base64")}`;
       const origRequest = cam._requestPart2.bind(cam);
       cam._requestPart2 = function (this: onvif.Cam, ...args: unknown[]): void {
@@ -234,7 +266,7 @@ export class OnvifConnector implements CameraConnector, OnvifPTZ {
   // ── PTZ: Continuous Move ──────────────────────────────────────
 
   async continuousMove(vector: PTZVector, _speed?: PTZSpeed): Promise<void> {
-    const cam = this.ensureCam();
+    const cam = await this.ensureCam();
     return new Promise<void>((resolve, reject) => {
       cam.continuousMove(
         {
@@ -254,7 +286,7 @@ export class OnvifConnector implements CameraConnector, OnvifPTZ {
   // ── PTZ: Stop ─────────────────────────────────────────────────
 
   async stopMove(panTilt: boolean = true, zoom: boolean = true): Promise<void> {
-    const cam = this.ensureCam();
+    const cam = await this.ensureCam();
     try {
       return await new Promise<void>((resolve, reject) => {
         cam.stop({ panTilt, zoom }, (err: Error | null) => {
@@ -276,7 +308,7 @@ export class OnvifConnector implements CameraConnector, OnvifPTZ {
   // ── PTZ: Absolute Move ────────────────────────────────────────
 
   async absoluteMove(position: PTZVector, speed?: PTZSpeed): Promise<void> {
-    const cam = this.ensureCam();
+    const cam = await this.ensureCam();
     return new Promise<void>((resolve, reject) => {
       const opts: Record<string, unknown> = {
         x: position.pan,
@@ -300,7 +332,7 @@ export class OnvifConnector implements CameraConnector, OnvifPTZ {
   // ── PTZ: Presets ──────────────────────────────────────────────
 
   async listPresets(): Promise<PresetInfo[]> {
-    const cam = this.ensureCam();
+    const cam = await this.ensureCam();
     return new Promise<PresetInfo[]>((resolve, reject) => {
       cam.getPresets({}, (err: Error | null, presets?: unknown) => {
         if (err) {
@@ -325,7 +357,7 @@ export class OnvifConnector implements CameraConnector, OnvifPTZ {
   }
 
   async gotoPreset(token: string, speed?: PTZSpeed): Promise<void> {
-    const cam = this.ensureCam();
+    const cam = await this.ensureCam();
     return new Promise<void>((resolve, reject) => {
       const opts: Record<string, unknown> = { preset: token };
       if (speed) {
@@ -343,7 +375,7 @@ export class OnvifConnector implements CameraConnector, OnvifPTZ {
   }
 
   async savePreset(name: string, token?: string): Promise<string> {
-    const cam = this.ensureCam();
+    const cam = await this.ensureCam();
     return new Promise<string>((resolve, reject) => {
       const opts: Record<string, unknown> = { presetName: name };
       if (token) {
@@ -369,7 +401,7 @@ export class OnvifConnector implements CameraConnector, OnvifPTZ {
   // ── PTZ: Home ─────────────────────────────────────────────────
 
   async gotoHome(speed?: PTZSpeed): Promise<void> {
-    const cam = this.ensureCam();
+    const cam = await this.ensureCam();
     return new Promise<void>((resolve, reject) => {
       const opts: Record<string, unknown> = {};
       if (speed) {
@@ -387,7 +419,7 @@ export class OnvifConnector implements CameraConnector, OnvifPTZ {
   }
 
   async setHome(): Promise<void> {
-    const cam = this.ensureCam();
+    const cam = await this.ensureCam();
     return new Promise<void>((resolve, reject) => {
       cam.setHomePosition({}, (err: Error | null) => {
         if (err) reject(err);
@@ -399,7 +431,7 @@ export class OnvifConnector implements CameraConnector, OnvifPTZ {
   // ── PTZ: Status ───────────────────────────────────────────────
 
   async getStatus(): Promise<PTZStatus> {
-    const cam = this.ensureCam();
+    const cam = await this.ensureCam();
     return new Promise<PTZStatus>((resolve, reject) => {
       cam.getStatus(
         {},
@@ -413,11 +445,28 @@ export class OnvifConnector implements CameraConnector, OnvifPTZ {
 
   // ── Helpers ───────────────────────────────────────────────────
 
-  private ensureCam(): onvif.Cam {
-    if (!this._cam || !this._connected) {
-      throw new Error(`ONVIF camera "${this.cameraId}" is not connected`);
+  private async ensureCam(): Promise<onvif.Cam> {
+    if (this._cam && this._connected) {
+      return this._cam;
     }
-    return this._cam;
+
+    // Attempt reconnection once before giving up
+    logger.info(
+      { cameraId: this.cameraId },
+      "ONVIF camera disconnected — attempting reconnect",
+    );
+    try {
+      await this.connect();
+      if (this._cam && this._connected) {
+        return this._cam;
+      }
+    } catch (err) {
+      logger.warn(
+        { err, cameraId: this.cameraId },
+        "ONVIF reconnection failed",
+      );
+    }
+    throw new Error(`ONVIF camera "${this.cameraId}" is not connected`);
   }
 
   private parseSource(source: string): {

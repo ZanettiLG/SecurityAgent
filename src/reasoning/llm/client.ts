@@ -59,6 +59,22 @@ function severityLabel(severity: number): string {
   return labels[severity] ?? "UNKNOWN";
 }
 
+// ── Constants ────────────────────────────────────────────────────
+
+/** Maximum characters for user prompt to fit within model context.
+ *  With max_model_len=4096 and max_tokens=1024, input gets ~3072 tokens.
+ *  Conservatively assume ~2 chars/token for Portuguese on MiniCPM tokenizer. */
+const MAX_PROMPT_CHARS = 5500;
+
+/** Maximum chars for inline JSON payloads to keep prompts manageable. */
+const MAX_PAYLOAD_CHARS = 800;
+
+function safePayload(obj: unknown): string {
+  const raw = JSON.stringify(obj);
+  if (raw.length <= MAX_PAYLOAD_CHARS) return raw;
+  return raw.slice(0, MAX_PAYLOAD_CHARS - 30) + "...}";
+}
+
 // ── LlmClient ────────────────────────────────────────────────────
 
 export class LlmClient {
@@ -66,7 +82,7 @@ export class LlmClient {
 
   constructor(config: LlmClientConfig) {
     this.config = {
-      maxTokens: 4096,
+      maxTokens: 1024,
       temperature: 0.3,
       ...config,
     };
@@ -99,10 +115,10 @@ export class LlmClient {
       `Câmera: ${event.cameraId ?? "N/A"}`,
       `Timestamp: ${event.timestamp.toISOString()}`,
       `Pessoas envolvidas: ${event.personsInvolved.join(", ") || "nenhuma"}`,
-      `Payload: ${JSON.stringify(event.payload)}`,
+      `Payload: ${safePayload(event.payload)}`,
       "",
       "Contexto adicional:",
-      JSON.stringify(context, null, 2),
+      safePayload(context),
       "",
       `Retorne APENAS um JSON com:
 {
@@ -137,10 +153,10 @@ export class LlmClient {
       `Câmera: ${event.cameraId ?? "N/A"}`,
       `Timestamp: ${event.timestamp.toISOString()}`,
       `Pessoas envolvidas: ${event.personsInvolved.join(", ") || "nenhuma"}`,
-      `Payload: ${JSON.stringify(event.payload)}`,
+      `Payload: ${safePayload(event.payload)}`,
       "",
       "Contexto adicional:",
-      JSON.stringify(context, null, 2),
+      safePayload(context),
       "",
       `Retorne APENAS um JSON com uma lista de hipóteses no formato:
 {
@@ -222,6 +238,18 @@ export class LlmClient {
     systemPrompt: string,
     userPrompt: string,
   ): Promise<string> {
+    // Truncate user prompt to fit context window
+    let safePrompt = userPrompt;
+    if (userPrompt.length > MAX_PROMPT_CHARS) {
+      safePrompt =
+        userPrompt.slice(0, MAX_PROMPT_CHARS - 200) +
+        "\n\n[prompt truncado por limite de contexto]";
+      logger.warn(
+        { originalLen: userPrompt.length, truncatedLen: safePrompt.length },
+        "Prompt truncated to fit model context window",
+      );
+    }
+
     const client = new OpenAI({
       apiKey: this.config.apiKey ?? "not-needed",
       baseURL: this.config.baseUrl,
@@ -233,7 +261,7 @@ export class LlmClient {
       temperature: this.config.temperature,
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
+        { role: "user", content: safePrompt },
       ],
       ...(this.isThinkingModel()
         ? { extra_body: { enable_thinking: true } }
@@ -251,6 +279,58 @@ export class LlmClient {
    */
   async generateText(userPrompt: string): Promise<string> {
     return this.generate(SYSTEM_PROMPT, userPrompt);
+  }
+
+  // ── Public: Vision (LLM image analysis) ────────────────────
+
+  /**
+   * Gera uma descrição de cena a partir de uma imagem (LLM Vision).
+   *
+   * Envia o frame JPEG em data URI + system prompt para o modelo.
+   * Usa o SDK OpenAI com suporte a image_url content blocks.
+   * Compatível com OpenAI (GPT-4o-mini), Ollama (minicpm-v, llava), etc.
+   */
+  async generateVision(
+    systemPrompt: string,
+    imageDataUri: string,
+    opts?: { maxTokens?: number; model?: string },
+  ): Promise<string> {
+    const model = opts?.model ?? this.config.model;
+    const maxTokens = opts?.maxTokens ?? this.config.maxTokens ?? 300;
+
+    const client = new OpenAI({
+      apiKey: this.config.apiKey ?? "not-needed",
+      baseURL: this.config.baseUrl,
+    });
+
+    try {
+      const response = await client.chat.completions.create({
+        model,
+        max_tokens: maxTokens,
+        temperature: 0.1,
+        messages: [
+          { role: "system", content: systemPrompt },
+          {
+            role: "user",
+            content: [
+              {
+                type: "image_url",
+                image_url: { url: imageDataUri, detail: "low" },
+              },
+              {
+                type: "text",
+                text: "Descreva esta cena conforme o formato JSON solicitado.",
+              },
+            ],
+          },
+        ],
+      });
+
+      return response.choices[0]?.message?.content ?? "";
+    } catch (err) {
+      logger.error({ err, model }, "Vision request failed");
+      return "";
+    }
   }
 
   // ── Private: Response parsing ─────────────────────────────────

@@ -16,8 +16,8 @@ cameras:
     source: "rtsp://${CAM1_USER}:${CAM1_PASS}@${CAM1_IP}:${CAM1_PORT}/cam/realmonitor?channel=1&subtype=0"
     transport: "tcp" # Intelbras funciona com TCP
     enabled: true
-    onvifPort: 80 # ONVIF HTTP na porta 80 (WS-Security, padrao da lib)
-    onvifUseWSSecurity: true # Intelbras requer WS-Security (nao Digest/Basic)
+    onvifPort: 80 # ONVIF HTTP na porta 80
+    onvifUseWSSecurity: true # Intelbras iM7 requer WS-Security para PTZ (GetCapabilities sem auth, mas PTZ precisa)
     zones:
       - name: "entrance"
         coords: [0, 0, 640, 480]
@@ -96,10 +96,10 @@ goap:
 
 # ── LLM ──
 llm:
-  base_url: "${LLM_BASE_URL:-http://localhost:11434/v1}"
-  api_key: "${LLM_API_KEY:-}"
+  baseUrl: "${LLM_BASE_URL:-http://localhost:8000/v1}"
+  apiKey: "${LLM_API_KEY:-not-needed}"
   model: "${LLM_MODEL:-minicpm-v4.6}"
-  max_tokens: 4096
+  maxTokens: 4096
   temperature: 0.3
 
 # ── Actions ──

@@ -70,15 +70,17 @@ services:
     restart: unless-stopped
     command:
       - "--model"
-      - "${LLM_MODEL:-minicpm-v4.6}"
+      - "${LLM_MODEL:-openbmb/MiniCPM-V-4_6}"
       - "--host"
       - "0.0.0.0"
       - "--port"
       - "11434"
       - "--max-model-len"
-      - "32768"
+      - "4096"
+      - "--max-num-seqs"
+      - "8"
       - "--gpu-memory-utilization"
-      - "0.90"
+      - "0.80"
     ports:
       - "11434:11434"
     volumes:

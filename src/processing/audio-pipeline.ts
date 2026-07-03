@@ -194,7 +194,7 @@ export class AudioPipeline {
     const zeroCrossings = this.countZeroCrossings(chunk.data);
 
     let soundClass = "ambient";
-    let severity = Severity.INFO;
+    let severity: Severity = Severity.INFO;
 
     // Heurística simples baseada em características do sinal
     if (rms > 0.8) {

@@ -1,4 +1,5 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, type CSSProperties } from "react";
+import { useMediaQuery } from "./lib/useMediaQuery";
 
 // ── API helpers ──
 
@@ -16,44 +17,6 @@ async function ptzCmd(cameraId: string, cmd: string, body?: unknown) {
   }
 }
 
-// ── Styles ──
-
-const padBtn: React.CSSProperties = {
-  width: 44,
-  height: 44,
-  borderRadius: 8,
-  border: "1px solid #374151",
-  background: "#1f2937",
-  color: "#d1d5db",
-  fontSize: 18,
-  cursor: "pointer",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  transition: "background 0.15s, border-color 0.15s",
-  userSelect: "none",
-  lineHeight: 1,
-};
-
-const zoomBtn: React.CSSProperties = {
-  ...padBtn,
-  width: 36,
-  height: 36,
-  fontSize: 16,
-  borderRadius: 6,
-};
-
-const stopBtn: React.CSSProperties = {
-  ...padBtn,
-  width: 48,
-  height: 48,
-  borderRadius: "50%",
-  border: "2px solid #ef4444",
-  color: "#ef4444",
-  fontSize: 14,
-  fontWeight: 600,
-};
-
 // ── Component ──
 
 interface Props {
@@ -65,6 +28,7 @@ interface Props {
 export default function PTZControls({ cameraId, visible, onClose }: Props) {
   const [activeDir, setActiveDir] = useState<string | null>(null);
   const moveTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isMobile = useMediaQuery("(max-width: 768px)");
 
   const startMove = useCallback(
     (dir: string, pan: number, tilt: number) => {
@@ -104,153 +68,222 @@ export default function PTZControls({ cameraId, visible, onClose }: Props) {
 
   if (!visible) return null;
 
+  const btnClass = (dir: string) =>
+    `ptz-controls__btn${activeDir === dir ? " ptz-controls__btn--active" : ""}`;
+
+  const btnStyle = (dir: string): CSSProperties | undefined =>
+    activeDir === dir
+      ? { background: "#2563eb", borderColor: "#3b82f6" }
+      : undefined;
+
+  // ── Mobile: horizontal bottom-sheet layout ──
+  if (isMobile) {
+    return (
+      <div className="ptz-controls--mobile" onTouchEnd={stopMove}>
+        <button
+          type="button"
+          onClick={onClose}
+          className="ptz-controls__close"
+          aria-label="Fechar controles PTZ"
+        >
+          ✕
+        </button>
+
+        <div className="ptz-controls--mobile ptz-controls__dir-row">
+          <button
+            type="button"
+            className={btnClass("left")}
+            style={btnStyle("left")}
+            onMouseDown={() => startMove("left", -1, 0)}
+            onMouseUp={stopMove}
+            onTouchStart={() => startMove("left", -1, 0)}
+            onTouchEnd={stopMove}
+            aria-label="Pan Left"
+          >
+            ◀
+          </button>
+          <button
+            type="button"
+            className={btnClass("up")}
+            style={btnStyle("up")}
+            onMouseDown={() => startMove("up", 0, 1)}
+            onMouseUp={stopMove}
+            onTouchStart={() => startMove("up", 0, 1)}
+            onTouchEnd={stopMove}
+            aria-label="Tilt Up"
+          >
+            ▲
+          </button>
+          <button
+            type="button"
+            className="ptz-controls__btn ptz-controls__btn--stop"
+            onClick={stopMove}
+            aria-label="Parar movimento"
+          >
+            ■
+          </button>
+          <button
+            type="button"
+            className={btnClass("down")}
+            style={btnStyle("down")}
+            onMouseDown={() => startMove("down", 0, -1)}
+            onMouseUp={stopMove}
+            onTouchStart={() => startMove("down", 0, -1)}
+            onTouchEnd={stopMove}
+            aria-label="Tilt Down"
+          >
+            ▼
+          </button>
+          <button
+            type="button"
+            className={btnClass("right")}
+            style={btnStyle("right")}
+            onMouseDown={() => startMove("right", 1, 0)}
+            onMouseUp={stopMove}
+            onTouchStart={() => startMove("right", 1, 0)}
+            onTouchEnd={stopMove}
+            aria-label="Pan Right"
+          >
+            ▶
+          </button>
+        </div>
+
+        <div className="ptz-controls__zoom-row">
+          <button
+            type="button"
+            className="ptz-controls__zoom-btn"
+            onClick={() => handleZoom(1)}
+            aria-label="Zoom In"
+          >
+            🔍+
+          </button>
+          <button
+            type="button"
+            className="ptz-controls__zoom-btn"
+            onClick={() => handleZoom(-1)}
+            aria-label="Zoom Out"
+          >
+            🔍−
+          </button>
+          <button
+            type="button"
+            className="ptz-controls__zoom-btn"
+            style={{ fontSize: 12 }}
+            onClick={goHome}
+            aria-label="Posição Home"
+          >
+            🏠
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Desktop: absolute d-pad layout ──
   return (
     <fieldset
+      className="ptz-controls"
       aria-label="Controles PTZ da câmera"
-      style={{
-        position: "absolute",
-        bottom: 8,
-        right: 8,
-        zIndex: 20,
-        display: "flex",
-        flexDirection: "column",
-        gap: 6,
-        alignItems: "center",
-      }}
       onMouseLeave={stopMove}
       onTouchEnd={stopMove}
     >
-      {/* Close button */}
       <button
         type="button"
         onClick={onClose}
-        style={{
-          position: "absolute",
-          top: -28,
-          right: 0,
-          background: "none",
-          border: "none",
-          color: "#9ca3af",
-          fontSize: 16,
-          cursor: "pointer",
-          padding: "2px 6px",
-        }}
-        title="Fechar controles PTZ"
+        className="ptz-controls__close"
+        aria-label="Fechar controles PTZ"
       >
         ✕
       </button>
 
-      {/* Directional pad */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "44px 44px 44px",
-          gridTemplateRows: "44px 44px 44px",
-          gap: 3,
-        }}
-      >
-        {/* Row 1: empty, UP, empty */}
+      <div className="ptz-controls__pad">
         <div />
         <button
           type="button"
-          style={{
-            ...padBtn,
-            background: activeDir === "up" ? "#2563eb" : padBtn.background,
-            borderColor: activeDir === "up" ? "#3b82f6" : padBtn.borderColor,
-          }}
+          className={btnClass("up")}
+          style={btnStyle("up")}
           onMouseDown={() => startMove("up", 0, 1)}
           onMouseUp={stopMove}
           onTouchStart={() => startMove("up", 0, 1)}
           onTouchEnd={stopMove}
-          title="Tilt Up"
+          aria-label="Tilt Up"
         >
           ▲
         </button>
         <div />
 
-        {/* Row 2: LEFT, STOP, RIGHT */}
         <button
           type="button"
-          style={{
-            ...padBtn,
-            background: activeDir === "left" ? "#2563eb" : padBtn.background,
-            borderColor: activeDir === "left" ? "#3b82f6" : padBtn.borderColor,
-          }}
+          className={btnClass("left")}
+          style={btnStyle("left")}
           onMouseDown={() => startMove("left", -1, 0)}
           onMouseUp={stopMove}
           onTouchStart={() => startMove("left", -1, 0)}
           onTouchEnd={stopMove}
-          title="Pan Left"
+          aria-label="Pan Left"
         >
           ◀
         </button>
         <button
           type="button"
-          style={stopBtn}
+          className="ptz-controls__btn ptz-controls__btn--stop"
           onClick={stopMove}
-          title="Parar movimento"
+          aria-label="Parar movimento"
         >
           ■
         </button>
         <button
           type="button"
-          style={{
-            ...padBtn,
-            background: activeDir === "right" ? "#2563eb" : padBtn.background,
-            borderColor: activeDir === "right" ? "#3b82f6" : padBtn.borderColor,
-          }}
+          className={btnClass("right")}
+          style={btnStyle("right")}
           onMouseDown={() => startMove("right", 1, 0)}
           onMouseUp={stopMove}
           onTouchStart={() => startMove("right", 1, 0)}
           onTouchEnd={stopMove}
-          title="Pan Right"
+          aria-label="Pan Right"
         >
           ▶
         </button>
 
-        {/* Row 3: empty, DOWN, empty */}
         <div />
         <button
           type="button"
-          style={{
-            ...padBtn,
-            background: activeDir === "down" ? "#2563eb" : padBtn.background,
-            borderColor: activeDir === "down" ? "#3b82f6" : padBtn.borderColor,
-          }}
+          className={btnClass("down")}
+          style={btnStyle("down")}
           onMouseDown={() => startMove("down", 0, -1)}
           onMouseUp={stopMove}
           onTouchStart={() => startMove("down", 0, -1)}
           onTouchEnd={stopMove}
-          title="Tilt Down"
+          aria-label="Tilt Down"
         >
           ▼
         </button>
         <div />
       </div>
 
-      {/* Zoom controls */}
-      <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+      <div className="ptz-controls__zoom-row">
         <button
           type="button"
-          style={zoomBtn}
+          className="ptz-controls__zoom-btn"
           onClick={() => handleZoom(1)}
-          title="Zoom In"
+          aria-label="Zoom In"
         >
           🔍+
         </button>
         <button
           type="button"
-          style={zoomBtn}
+          className="ptz-controls__zoom-btn"
           onClick={() => handleZoom(-1)}
-          title="Zoom Out"
+          aria-label="Zoom Out"
         >
           🔍−
         </button>
         <button
           type="button"
-          style={{ ...zoomBtn, fontSize: 12 }}
+          className="ptz-controls__zoom-btn"
+          style={{ fontSize: 12 }}
           onClick={goHome}
-          title="Posição Home"
+          aria-label="Posição Home"
         >
           🏠
         </button>

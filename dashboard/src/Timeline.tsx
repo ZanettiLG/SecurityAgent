@@ -5,35 +5,35 @@ interface TimelineEvent {
   cameraId: string;
 }
 
-function Timeline({ events }: { events: TimelineEvent[] }) {
-  const sevColor: Record<number, string> = { 0: "#22c55e", 1: "#22c55e", 2: "#fbbf24", 3: "#f97316", 4: "#ef4444" };
+const SEV_COLORS: Record<number, string> = {
+  0: "#22c55e",
+  1: "#22c55e",
+  2: "#fbbf24",
+  3: "#f97316",
+  4: "#ef4444",
+};
 
+function Timeline({ events }: { events: TimelineEvent[] }) {
   return (
-    <div style={{ height: 200, borderTop: "1px solid #1e293b", display: "flex", flexDirection: "column" }}>
-      <div style={{
-        padding: "6px 12px", backgroundColor: "#1a2235",
-        fontSize: 12, fontWeight: 600, borderBottom: "1px solid #1e293b",
-      }}>
-        📋 Timeline
-      </div>
-      <div style={{ flex: 1, overflow: "auto", padding: "6px 12px" }}>
+    <div className="timeline">
+      <div className="timeline__header">📋 Timeline</div>
+      <div className="timeline__list">
         {events.length === 0 && (
-          <div style={{ color: "#6b7280", fontSize: 11, padding: 8 }}>
-            Nenhum evento ainda
-          </div>
+          <div className="timeline__empty">Nenhum evento ainda</div>
         )}
         {events.map((ev, i) => (
-          <div key={i} style={{
-            padding: "4px 0", borderBottom: "1px solid #1e293b",
-            display: "flex", gap: 8, alignItems: "flex-start", fontSize: 11,
-          }}>
-            <span style={{
-              width: 6, height: 6, borderRadius: "50%",
-              backgroundColor: sevColor[ev.severity] || "#6b7280",
-              marginTop: 4, flexShrink: 0,
-            }} />
-            <span style={{ color: "#6b7280", flexShrink: 0 }}>{ev.timestamp.toLocaleTimeString()}</span>
-            <span style={{ flex: 1 }}>{ev.description}</span>
+          <div key={i} className="timeline__item">
+            <span
+              className="timeline__dot"
+              style={{ backgroundColor: SEV_COLORS[ev.severity] || "#6b7280" }}
+            />
+            <span className="timeline__time">
+              {new Intl.DateTimeFormat("pt-BR", {
+                hour: "2-digit",
+                minute: "2-digit",
+              }).format(ev.timestamp)}
+            </span>
+            <span className="timeline__desc">{ev.description}</span>
           </div>
         ))}
       </div>

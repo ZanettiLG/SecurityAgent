@@ -69,61 +69,43 @@ function CameraCard({
   const hasAlert = alerts.length > 0;
   const topAlert = alerts[0];
 
-  // Determine border color based on severity
-  const borderColor = useMemo(() => {
-    if (!cam.online) return "#374151";
-    if (!hasAlert) return "#1e293b";
+  // Determine card modifier based on state
+  const cardMod = useMemo(() => {
+    if (!cam.online) return "camera-card--offline";
+    if (!hasAlert) return "camera-card--online";
     const maxSev = Math.max(...alerts.map((a) => a.severity));
-    if (maxSev >= 4) return "#ef4444"; // threat
-    if (maxSev >= 3) return "#f59e0b"; // alert
-    return "#3b82f6"; // observation
+    if (maxSev >= 4) return "camera-card--online camera-card--threat";
+    if (maxSev >= 3) return "camera-card--online camera-card--amber";
+    return "camera-card--online camera-card--alert";
   }, [cam.online, hasAlert, alerts]);
+
+  // Dot modifier
+  const dotMod = useMemo(() => {
+    if (!cam.online) return "camera-card__dot--offline";
+    return hasAlert ? "camera-card__dot--alert" : "camera-card__dot--online";
+  }, [cam.online, hasAlert]);
+
+  // Overlay severity modifier
+  const overlaySev = useMemo(() => {
+    if (!topAlert) return "info";
+    return topAlert.severity >= 4
+      ? "threat"
+      : topAlert.severity >= 3
+        ? "alert"
+        : "info";
+  }, [topAlert]);
 
   return (
     <div
       onClick={cam.online ? onClick : undefined}
-      style={{
-        backgroundColor: "#111827",
-        borderRadius: 8,
-        overflow: "hidden",
-        border: `2px solid ${borderColor}`,
-        display: "flex",
-        flexDirection: "column",
-        cursor: cam.online && onClick ? "pointer" : "default",
-        transition: "border-color 0.3s ease",
-        boxShadow: hasAlert ? `0 0 20px ${borderColor}33` : "none",
-      }}
+      className={`camera-card ${cardMod}`}
     >
       {/* Header bar */}
-      <div
-        style={{
-          padding: "6px 12px",
-          backgroundColor: "#1a2235",
-          fontSize: 12,
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-        }}
-      >
-        <span
-          style={{
-            width: 8,
-            height: 8,
-            borderRadius: "50%",
-            backgroundColor: cam.online
-              ? hasAlert
-                ? "#f59e0b"
-                : "#22c55e"
-              : "#6b7280",
-            display: "inline-block",
-            animation: hasAlert ? "pulse 1.5s infinite" : "none",
-          }}
-        />
-        <span style={{ flex: 1 }}>{cam.name}</span>
+      <div className="camera-card__header">
+        <span className={`camera-card__dot ${dotMod}`} />
+        <span className="camera-card__name">{cam.name}</span>
         {motion && motion.count > 0 && (
-          <span style={{ fontSize: 10, color: "#6b7280" }}>
-            🏃 {motion.count}x
-          </span>
+          <span className="camera-card__motion">🏃 {motion.count}x</span>
         )}
         {cam.online && (
           <button
@@ -132,17 +114,10 @@ function CameraCard({
               e.stopPropagation();
               setShowPTZ((v) => !v);
             }}
-            title={showPTZ ? "Fechar controles PTZ" : "Abrir controles PTZ"}
-            style={{
-              background: showPTZ ? "#2563eb" : "transparent",
-              border: showPTZ ? "1px solid #3b82f6" : "1px solid #374151",
-              color: showPTZ ? "#fff" : "#9ca3af",
-              borderRadius: 4,
-              fontSize: 11,
-              padding: "2px 8px",
-              cursor: "pointer",
-              transition: "all 0.15s",
-            }}
+            className={`camera-card__ptz-btn${showPTZ ? " camera-card__ptz-btn--active" : ""}`}
+            aria-label={
+              showPTZ ? "Fechar controles PTZ" : "Abrir controles PTZ"
+            }
           >
             🎥 PTZ
           </button>
@@ -150,109 +125,60 @@ function CameraCard({
       </div>
 
       {/* Camera feed */}
-      <div
-        style={{
-          flex: 1,
-          backgroundColor: "#000",
-          position: "relative",
-          minHeight: 200,
-        }}
-      >
+      <div className="camera-card__feed">
         {cam.online ? (
           !imgError ? (
             <img
               src={snapshotUrl}
               alt={cam.name}
-              style={{ width: "100%", height: "100%", objectFit: "contain" }}
+              className="camera-card__feed-img"
               onError={() => setImgError(true)}
               onLoad={() => setImgError(false)}
             />
           ) : (
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                height: "100%",
-                color: "#ef4444",
-                fontSize: 13,
-                gap: 8,
-              }}
-            >
+            <div className="camera-card__feed-placeholder camera-card__feed-placeholder--error">
               ⚠️ Sem sinal — tentando novamente...
             </div>
           )
         ) : (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              height: "100%",
-              color: "#6b7280",
-              fontSize: 14,
-            }}
-          >
+          <div className="camera-card__feed-placeholder camera-card__feed-placeholder--offline">
             ⚫ Câmera offline
           </div>
         )}
 
-        {/* ── Alert Overlay ── */}
-        {hasAlert && (
-          <div
-            style={{
-              position: "absolute",
-              bottom: 0,
-              left: 0,
-              right: 0,
-              background: "linear-gradient(transparent, rgba(0,0,0,0.85))",
-              padding: "20px 12px 10px",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                marginBottom: 4,
-              }}
-            >
+        {/* Alert Overlay */}
+        {hasAlert && topAlert && (
+          <div className="camera-card__overlay">
+            <div className="camera-card__overlay-row">
               <span
-                style={{
-                  width: 10,
-                  height: 10,
-                  borderRadius: "50%",
-                  backgroundColor:
-                    topAlert.severity >= 3 ? "#f59e0b" : "#3b82f6",
-                  animation: "pulse 1.5s infinite",
-                }}
+                className={`camera-card__overlay-dot camera-card__overlay-dot--${overlaySev}`}
               />
-              <span style={{ fontSize: 13, fontWeight: 600, color: "#f8fafc" }}>
+              <span
+                className={`camera-card__overlay-type camera-card__overlay-type--${overlaySev}`}
+              >
                 {topAlert.eventType === "vehicle_detected" ? "🚗" : "👤"}{" "}
                 {topAlert.description}
               </span>
+              <span className="camera-card__overlay-time">
+                {topAlert.timestamp.toLocaleTimeString()}
+              </span>
             </div>
             {topAlert.eventType === "vehicle_detected" && (
-              <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
-                <span
-                  style={{
-                    fontSize: 11,
-                    padding: "3px 8px",
-                    borderRadius: 4,
-                    backgroundColor: "rgba(59,130,246,0.3)",
-                    color: "#93c5fd",
-                    border: "1px solid rgba(59,130,246,0.5)",
-                  }}
-                >
-                  Toque para identificar →
-                </span>
-              </div>
+              <button
+                type="button"
+                className="camera-card__overlay-cta"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClick?.();
+                }}
+              >
+                Identificar veículo →
+              </button>
             )}
           </div>
         )}
 
-        {/* ── Motion indicator (subtle) ── */}
+        {/* Motion indicator (subtle) */}
         {motion && motion.count > 3 && !hasAlert && (
           <div
             style={{
@@ -270,7 +196,7 @@ function CameraCard({
           </div>
         )}
 
-        {/* ── PTZ Controls ── */}
+        {/* PTZ Controls */}
         {cam.online && (
           <PTZControls
             cameraId={cam.id}
@@ -319,36 +245,21 @@ function CameraGrid({
   }, []);
 
   return (
-    <>
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.4; }
-        }
-      `}</style>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(400px, 1fr))",
-          gap: 12,
-          height: "100%",
-        }}
-      >
-        {cameras.map((cam) => {
-          const camAlerts = activeAlerts.filter((a) => a.cameraId === cam.id);
-          const camMotion = motionSummary.find((m) => m.cameraId === cam.id);
-          return (
-            <MemoCard
-              key={cam.id}
-              cam={cam}
-              alerts={camAlerts}
-              motion={camMotion}
-              onClick={() => onCameraClick?.(cam.id)}
-            />
-          );
-        })}
-      </div>
-    </>
+    <div className="camera-grid">
+      {cameras.map((cam) => {
+        const camAlerts = activeAlerts.filter((a) => a.cameraId === cam.id);
+        const camMotion = motionSummary.find((m) => m.cameraId === cam.id);
+        return (
+          <MemoCard
+            key={cam.id}
+            cam={cam}
+            alerts={camAlerts}
+            motion={camMotion}
+            onClick={() => onCameraClick?.(cam.id)}
+          />
+        );
+      })}
+    </div>
   );
 }
 

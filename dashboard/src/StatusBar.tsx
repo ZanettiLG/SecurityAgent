@@ -1,22 +1,29 @@
-function StatusBar({ connected, eventsCount, camerasOnline, threats }: {
+function StatusBar({
+  connected,
+  eventsCount,
+  camerasOnline,
+  threats,
+}: {
   connected: boolean;
   eventsCount: number;
   camerasOnline: number;
   threats: number;
 }) {
   return (
-    <footer style={{
-      padding: "4px 16px", backgroundColor: "#111827",
-      borderTop: "1px solid #1e293b", display: "flex", gap: 24,
-      fontSize: 11, color: "#64748b", flexShrink: 0,
-    }}>
-      <span style={{ color: connected ? "#22c55e" : "#ef4444" }}>
+    <footer className="status-bar">
+      <span
+        className={
+          connected
+            ? "status-bar__item status-bar__item--connected"
+            : "status-bar__item status-bar__item--disconnected"
+        }
+      >
         {connected ? "🟢" : "🔴"} {connected ? "Conectado" : "Desconectado"}
       </span>
-      <span>📷 {camerasOnline}/2 câmeras</span>
-      <span>⚠️ {threats} ameaças</span>
-      <span>📊 {eventsCount} eventos hoje</span>
-      <span style={{ marginLeft: "auto" }}>🧠 MiniCPM-V 4.6</span>
+      <span className="status-bar__item">📷 {camerasOnline}/2 câmeras</span>
+      <span className="status-bar__item">⚠️ {threats} ameaças</span>
+      <span className="status-bar__item">📊 {eventsCount} eventos hoje</span>
+      <span className="status-bar__model">🧠 MiniCPM-V 4.6</span>
     </footer>
   );
 }

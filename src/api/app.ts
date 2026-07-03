@@ -12,7 +12,7 @@
 import express, { type Express } from "express";
 import { readdirSync } from "node:fs";
 import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { logger } from "../core/logger.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -46,7 +46,7 @@ export async function createApiApp(): Promise<Express> {
     routeFiles.map(async (file) => {
       const routePath = join(routesDir, file);
       try {
-        const mod: RouteModule = await import(routePath);
+        const mod: RouteModule = await import(pathToFileURL(routePath).href);
         const prefix = mod.path ?? derivePrefix(file);
         const handler = mod.router ?? mod.default;
         if (handler) {

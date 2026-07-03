@@ -34,27 +34,28 @@ function VehicleIdentifyModal({
   const [showCustom, setShowCustom] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
   const [snapshotTs] = useState(() => Date.now());
   const snapshotUrl = `/cameras/${cameraId}/snapshot?t=${snapshotTs}`;
 
-  // Close on Escape
+  // Close on Escape + focus trap
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", handler);
+    // Focus the modal on mount
+    modalRef.current?.focus();
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
 
   const handleSelect = (value: string) => {
     if (value.endsWith(" ")) {
-      // Needs text input
       setShowCustom(true);
       setCustomText(value);
       setTimeout(() => inputRef.current?.focus(), 100);
     } else {
       setSelected(value);
-      // Brief delay for visual feedback
       setTimeout(() => onIdentify(cameraId, value), 300);
     }
   };
@@ -68,131 +69,70 @@ function VehicleIdentifyModal({
 
   return (
     <div
+      className="vehicle-modal__backdrop"
       onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 1000,
-        backgroundColor: "rgba(0,0,0,0.7)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        backdropFilter: "blur(4px)",
-      }}
+      role="presentation"
     >
       <div
+        ref={modalRef}
+        className="vehicle-modal"
         onClick={(e) => e.stopPropagation()}
-        style={{
-          backgroundColor: "#111827",
-          borderRadius: 12,
-          border: "1px solid #1e293b",
-          maxWidth: 480,
-          width: "90%",
-          boxShadow: "0 25px 60px rgba(0,0,0,0.5)",
-          overflow: "hidden",
-        }}
+        role="dialog"
+        aria-label="Identificar veículo ou pessoa"
+        tabIndex={-1}
       >
-        {/* ── Camera Snapshot ── */}
-        <div
-          style={{ position: "relative", backgroundColor: "#000", height: 240 }}
-        >
+        {/* Camera Snapshot */}
+        <div className="vehicle-modal__snapshot">
           <img
             src={snapshotUrl}
             alt={`Câmera ${cameraId}`}
-            style={{ width: "100%", height: "100%", objectFit: "contain" }}
+            className="vehicle-modal__snapshot-img"
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = "none";
             }}
           />
-          <div
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              right: 0,
-              background: "linear-gradient(rgba(0,0,0,0.7), transparent)",
-              padding: "12px 16px",
-            }}
-          >
-            <div
-              style={{
-                fontSize: 10,
-                color: "#6b7280",
-                textTransform: "uppercase",
-                letterSpacing: 1,
-              }}
-            >
+          <div className="vehicle-modal__snapshot-header">
+            <div className="vehicle-modal__snapshot-label">
               📷 Câmera {cameraId}
             </div>
           </div>
-          <div
-            style={{
-              position: "absolute",
-              bottom: 0,
-              left: 0,
-              right: 0,
-              background: "linear-gradient(transparent, rgba(0,0,0,0.8))",
-              padding: "20px 16px 10px",
-            }}
-          >
-            <div style={{ fontSize: 14, fontWeight: 600, color: "#f8fafc" }}>
-              {description}
-            </div>
+          <div className="vehicle-modal__snapshot-desc">
+            <div className="vehicle-modal__snapshot-text">{description}</div>
           </div>
         </div>
 
-        {/* ── Identification Options ── */}
-        <div style={{ padding: 16 }}>
-          <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 12 }}>
+        {/* Identification Options */}
+        <div className="vehicle-modal__body">
+          <div className="vehicle-modal__title">
             O que é este objeto/pessoa?
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div className="vehicle-modal__options">
             {QUICK_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
                 onClick={() => handleSelect(opt.value)}
                 disabled={selected !== null}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  padding: "10px 12px",
-                  borderRadius: 8,
-                  border:
-                    selected === opt.value
-                      ? "1px solid #3b82f6"
-                      : "1px solid #1e293b",
-                  backgroundColor:
-                    selected === opt.value
-                      ? "rgba(59,130,246,0.15)"
-                      : "#0f172a",
-                  color: "#e2e8f0",
-                  fontSize: 13,
-                  cursor: "pointer",
-                  transition: "all 0.2s",
-                  opacity: selected && selected !== opt.value ? 0.4 : 1,
-                  textAlign: "left",
-                }}
-                onMouseEnter={(e) => {
-                  if (!selected)
-                    e.currentTarget.style.backgroundColor =
-                      "rgba(59,130,246,0.1)";
-                }}
-                onMouseLeave={(e) => {
-                  if (!selected)
-                    e.currentTarget.style.backgroundColor = "#0f172a";
-                }}
+                className={`vehicle-modal__option${
+                  selected === opt.value
+                    ? " vehicle-modal__option--selected"
+                    : ""
+                }${
+                  selected && selected !== opt.value
+                    ? " vehicle-modal__option--dimmed"
+                    : ""
+                }`}
+                aria-label={opt.label}
               >
-                <span style={{ fontSize: 18 }}>{opt.icon}</span>
+                <span className="vehicle-modal__option-icon">{opt.icon}</span>
                 <span>{opt.label}</span>
               </button>
             ))}
           </div>
 
-          {/* ── Custom Text Input ── */}
+          {/* Custom Text Input */}
           {showCustom && (
-            <div style={{ marginTop: 12, display: "flex", gap: 6 }}>
+            <div className="vehicle-modal__custom">
               <input
                 ref={inputRef}
                 value={customText}
@@ -201,36 +141,19 @@ function VehicleIdentifyModal({
                   if (e.key === "Enter") handleCustomSubmit();
                 }}
                 placeholder="Descreva..."
-                style={{
-                  flex: 1,
-                  padding: "8px 12px",
-                  borderRadius: 6,
-                  border: "1px solid #3b82f6",
-                  backgroundColor: "#1e293b",
-                  color: "#e2e8f0",
-                  fontSize: 13,
-                  outline: "none",
-                }}
+                className="vehicle-modal__custom-input"
               />
               <button
                 onClick={handleCustomSubmit}
-                style={{
-                  padding: "8px 16px",
-                  borderRadius: 6,
-                  border: "none",
-                  backgroundColor: "#3b82f6",
-                  color: "#fff",
-                  fontSize: 12,
-                  cursor: "pointer",
-                  fontWeight: 500,
-                }}
+                className="camera-card__overlay-cta"
+                style={{ borderRadius: 6 }}
               >
                 Confirmar
               </button>
             </div>
           )}
 
-          {/* ── Skip / Close ── */}
+          {/* Skip / Close */}
           <div style={{ marginTop: 12, textAlign: "center" }}>
             <button
               onClick={onClose}

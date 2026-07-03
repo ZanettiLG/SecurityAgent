@@ -145,17 +145,33 @@ export function loadConfig(path?: string): AppConfig {
     path || join(__dirname, "..", "..", "config", "settings.yaml");
   let raw = readFileSync(configPath, "utf-8");
 
-  // Substitui ${VAR_NAME} por process.env.VAR_NAME
-  raw = raw.replace(/\$\{([^}]+)\}/g, (_, varName) => {
-    const name = varName.trim();
+  // Substitui ${VAR_NAME:-default} ou ${VAR_NAME} por process.env.VAR_NAME
+  // Suporta sintaxe bash: ${VAR:-fallback} — se VAR não existir, usa fallback
+  raw = raw.replace(/\$\{([^}]+)\}/g, (_, expr: string) => {
+    const trimmed = expr.trim();
+    // Parse ${VAR:-default} syntax
+    const colonIdx = trimmed.indexOf(":-");
+    let name: string;
+    let fallback: string;
+    if (colonIdx >= 0) {
+      name = trimmed.slice(0, colonIdx).trim();
+      fallback = trimmed.slice(colonIdx + 2);
+    } else {
+      name = trimmed;
+      fallback = "";
+    }
+
     const value = process.env[name];
     if (!value) {
+      if (fallback) {
+        return fallback;
+      }
       logger.warn(
         { varName: name },
         "Environment variable not set — camera may be disabled",
       );
     }
-    return value ?? "";
+    return value ?? fallback;
   });
 
   const parsed = parseYaml(raw);

@@ -516,10 +516,14 @@ export class SecurityAgent {
         await connector.connect();
         for await (const frame of connector.stream()) {
           if (!this.running) break;
+
+          let visionEvent: Awaited<ReturnType<VisionPipeline["process"]>> =
+            null;
+
           if (this.visionPipeline) {
-            const event = await this.visionPipeline.process(frame);
-            if (event) {
-              this.bus.publish("vision.event", event);
+            visionEvent = await this.visionPipeline.process(frame);
+            if (visionEvent) {
+              this.bus.publish("vision.event", visionEvent);
             }
           }
           // Vehicle tracking (paralelo)
@@ -532,10 +536,10 @@ export class SecurityAgent {
             }
           }
           // Scene semantic analysis (assíncrono — não bloqueia)
-          if (this.sceneAnalyzer && event) {
+          if (this.sceneAnalyzer && visionEvent) {
             void this.sceneAnalyzer.analyze(
               frame,
-              event.payload.changeRatio as number | undefined,
+              visionEvent.payload.changeRatio as number | undefined,
             );
           }
         }

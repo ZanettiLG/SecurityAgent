@@ -345,60 +345,21 @@ function App() {
   const motionEntries = Array.from(motionSummary.values());
 
   return (
-    <div
-      style={{
-        height: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        backgroundColor: "#0a0e17",
-        color: "#c8d6e5",
-        fontFamily: "'Segoe UI', system-ui, sans-serif",
-        overflow: "hidden",
-      }}
-    >
-      <header
-        style={{
-          padding: "8px 20px",
-          backgroundColor: "#111827",
-          display: "flex",
-          alignItems: "center",
-          gap: 16,
-          borderBottom: "1px solid #1e293b",
-          flexShrink: 0,
-        }}
-      >
-        <span
-          style={{
-            color: "#ef4444",
-            fontWeight: 700,
-            fontSize: 14,
-            letterSpacing: 1,
-          }}
-        >
-          🔴 AO VIVO
-        </span>
-        <span style={{ fontWeight: 600, fontSize: 15, flex: 1 }}>
-          Vigia — Central de Segurança
-        </span>
+    <div className="app">
+      <header className="app__header">
+        <span className="app__header-live">🔴 AO VIVO</span>
+        <span className="app__header-brand">Vigia — Central de Segurança</span>
         <span style={{ color: "#64748b", fontSize: 13 }}>
           {new Date().toLocaleTimeString()}
         </span>
       </header>
 
-      <main style={{ flex: 1, display: "flex", overflow: "hidden" }}>
-        <div
-          style={{
-            flex: 1,
-            padding: 12,
-            overflow: "auto",
-            position: "relative",
-          }}
-        >
+      <main className="app__main">
+        <div className="app__camera-area">
           <CameraGrid
             activeAlerts={activeAlerts}
             motionSummary={motionEntries}
             onCameraClick={(cameraId) => {
-              // Focus on camera — open identify modal if there's an alert
               const alert = activeAlerts.find((a) => a.cameraId === cameraId);
               if (alert) {
                 setIdentifyVehicle({
@@ -411,16 +372,7 @@ function App() {
             }}
           />
         </div>
-        <div
-          style={{
-            width: 400,
-            display: "flex",
-            flexDirection: "column",
-            borderLeft: "1px solid #1e293b",
-            backgroundColor: "#0f172a",
-            flexShrink: 0,
-          }}
-        >
+        <div className="app__sidebar">
           <ChatPanel
             messages={messages}
             connected={connected}
