@@ -57,6 +57,15 @@ import { SocialMediaInvestigator } from "../processing/social-investigator.js";
 import { SceneAnalyzer } from "../processing/scene-analyzer.js";
 import { AudioPipeline } from "../processing/audio-pipeline.js";
 import { SceneContextStore } from "../memory/scene-context-store.js";
+import {
+  ContextCompiler,
+  createSceneContextLayer,
+  createRecentEventsLayer,
+  createActiveHypothesesLayer,
+  createKnowledgeGraphStubLayer,
+  createRoutineContextStubLayer,
+  createConversationHistoryStubLayer,
+} from "../reasoning/context-compiler.js";
 
 // ── Agent ────────────────────────────────────────────────────────
 
@@ -84,6 +93,7 @@ export class SecurityAgent {
   hypothesisEngine: HypothesisEngine | null = null;
   sceneAnalyzer: SceneAnalyzer | null = null;
   sceneContextStore: SceneContextStore | null = null;
+  contextCompiler: ContextCompiler | null = null;
   socialInvestigator: SocialMediaInvestigator | null = null;
   socialPredictor: SocialPredictionEngine | null = null;
   queryManager: QueryManager | null = null;
@@ -164,6 +174,7 @@ export class SecurityAgent {
     );
     this.sceneContextStore = new SceneContextStore();
     this.memory.sceneContextStore = this.sceneContextStore;
+    this.contextCompiler = this._buildContextCompiler();
     this.behaviorMatcher = new BehavioralPatternMatcher();
     this.queryManager = new QueryManager(this.bus);
     this.knowledgeGraph = new KnowledgeGraph();
@@ -184,6 +195,62 @@ export class SecurityAgent {
     }
 
     logger.info("All subsystems initialized");
+  }
+
+  /** Constrói o ContextCompiler com todas as 7 camadas */
+  private _buildContextCompiler(): ContextCompiler {
+    const compiler = new ContextCompiler({
+      systemPrompt: [
+        "Você é o Vigia, um agente de segurança residencial inteligente.",
+        "Analise eventos de câmeras e sensores para avaliar situações.",
+        "Seja conservador: na dúvida, alerte. Priorize segurança.",
+        "Responda em português, de forma concisa e informativa.",
+      ].join("\n"),
+      totalBudget: this.config.llm.maxTokens > 2048 ? 3500 : 2000,
+    });
+
+    // Layer 1: Scene Context (prioridade 10)
+    if (this.sceneContextStore) {
+      compiler.registerLayer(
+        createSceneContextLayer((cameraId) =>
+          this.sceneContextStore!.getLlmContext(cameraId),
+        ),
+      );
+    }
+
+    // Layer 2: Knowledge Graph (stub — priority 20)
+    compiler.registerLayer(createKnowledgeGraphStubLayer());
+
+    // Layer 3: Routine Context (stub — priority 30)
+    compiler.registerLayer(createRoutineContextStubLayer());
+
+    // Layer 4: Recent Events (priority 40)
+    compiler.registerLayer(
+      createRecentEventsLayer(async () => {
+        if (!this.memory) return [];
+        const recent = await this.memory.eventStore.getRecent(60);
+        return recent.map((e) => ({
+          timestamp: e.timestamp.toISOString(),
+          type: e.eventType,
+          description: e.description,
+          severity: e.severity,
+        }));
+      }),
+    );
+
+    // Layer 5: Active Hypotheses (priority 50)
+    if (this.hypothesisEngine) {
+      compiler.registerLayer(
+        createActiveHypothesesLayer(() =>
+          this.hypothesisEngine!.getActiveHypotheses(),
+        ),
+      );
+    }
+
+    // Layer 6: Conversation History (stub — priority 60)
+    compiler.registerLayer(createConversationHistoryStubLayer());
+
+    return compiler;
   }
 
   // ── Main Loop ────────────────────────────────────────────────
@@ -454,6 +521,13 @@ export class SecurityAgent {
     if (!this.llmClient || !this.memory) return;
     try {
       const context = await this.memory.getContextForLlm(event);
+      // Adiciona contexto compilado (hierárquico) se disponível
+      if (this.contextCompiler) {
+        const compiled = await this.contextCompiler.compile(event);
+        if (compiled) {
+          (context as Record<string, unknown>).compiledContext = compiled;
+        }
+      }
       const assessment = await this.llmClient.evaluate(event, context);
       this.bus.publish(
         "llm.assessment",
@@ -477,6 +551,12 @@ export class SecurityAgent {
     if (!this.hypothesisEngine || !this.memory) return;
     try {
       const context = await this.memory.getContextForLlm(event);
+      if (this.contextCompiler) {
+        const compiled = await this.contextCompiler.compile(event);
+        if (compiled) {
+          (context as Record<string, unknown>).compiledContext = compiled;
+        }
+      }
       await this.hypothesisEngine.generateFromEvent(event, context);
     } catch (err) {
       logger.error(
@@ -523,6 +603,12 @@ export class SecurityAgent {
       const anomalous = recent.filter((e) => e.anomalyScore > 0.5);
       for (const event of anomalous.slice(0, 3)) {
         const context = await this.memory.getContextForLlm(event);
+        if (this.contextCompiler) {
+          const compiled = await this.contextCompiler.compile(event);
+          if (compiled) {
+            (context as Record<string, unknown>).compiledContext = compiled;
+          }
+        }
         void this.hypothesisEngine.generateFromEvent(event, context);
       }
     }
