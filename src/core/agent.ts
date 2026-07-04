@@ -66,6 +66,7 @@ import {
   createRoutineContextStubLayer,
   createConversationHistoryStubLayer,
 } from "../reasoning/context-compiler.js";
+import { ConsolidationLoop } from "../reasoning/consolidation-loop.js";
 
 // ── Agent ────────────────────────────────────────────────────────
 
@@ -94,6 +95,7 @@ export class SecurityAgent {
   sceneAnalyzer: SceneAnalyzer | null = null;
   sceneContextStore: SceneContextStore | null = null;
   contextCompiler: ContextCompiler | null = null;
+  consolidationLoop: ConsolidationLoop | null = null;
   socialInvestigator: SocialMediaInvestigator | null = null;
   socialPredictor: SocialPredictionEngine | null = null;
   queryManager: QueryManager | null = null;
@@ -175,6 +177,14 @@ export class SecurityAgent {
     this.sceneContextStore = new SceneContextStore();
     this.memory.sceneContextStore = this.sceneContextStore;
     this.contextCompiler = this._buildContextCompiler();
+    this.consolidationLoop = new ConsolidationLoop(
+      this.llmClient,
+      this.contextCompiler,
+      this.memory,
+      this.hypothesisEngine,
+      this.queryManager,
+      this.bus,
+    );
     this.behaviorMatcher = new BehavioralPatternMatcher();
     this.queryManager = new QueryManager(this.bus);
     this.knowledgeGraph = new KnowledgeGraph();
@@ -363,6 +373,9 @@ export class SecurityAgent {
     }, 5_000);
 
     logger.info("Agent loop started");
+
+    // Consolidation Loop — auto-aprendizado (Issue #1 Fase 4)
+    this.consolidationLoop?.start();
 
     // Mantém o processo vivo enquanto câmeras rodam
     await Promise.all(cameraTasks);
@@ -764,6 +777,7 @@ export class SecurityAgent {
     logger.info("Shutting down SecurityAgent (Vigia)...");
     this.running = false;
     if (this.tickInterval) clearInterval(this.tickInterval);
+    this.consolidationLoop?.stop();
 
     // Desconectar câmeras
     for (const camera of this.cameras) {
