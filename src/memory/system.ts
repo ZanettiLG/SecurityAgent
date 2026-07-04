@@ -14,6 +14,7 @@ import { SqlitePersonRegistry } from "./person-store.js";
 import { ChromaVectorStore } from "./chroma-vector-store.js";
 import { KnowledgeGraph } from "./knowledge-graph.js";
 import { SceneIndex } from "./scene-index.js";
+import type { SceneContextStore } from "./scene-context-store.js";
 
 // ── Vector Store ─────────────────────────────────────────────────
 
@@ -143,6 +144,7 @@ export class MemorySystem {
   anomalyDetector: AnomalyDetector;
   knowledgeGraph: KnowledgeGraph;
   sceneIndex: SceneIndex;
+  sceneContextStore: SceneContextStore | null = null;
 
   constructor(config?: { dataDir?: string; chromaHost?: string }) {
     const dataDir = config?.dataDir ?? "./data";
@@ -191,6 +193,9 @@ export class MemorySystem {
         severity: e.severity,
       })),
       personsInvolved: persons,
+      sceneContext: event.cameraId
+        ? (this.sceneContextStore?.getLlmContext(event.cameraId) ?? null)
+        : null,
     };
   }
 

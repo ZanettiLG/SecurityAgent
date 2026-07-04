@@ -23,6 +23,7 @@ import {
   SystemMode,
   type SecurityEvent,
   type FactValue,
+  type SceneObservation,
 } from "./types.js";
 import { VisionPipeline } from "../processing/vision-pipeline.js";
 import { VehicleTracker } from "../processing/vehicle-tracker.js";
@@ -55,6 +56,7 @@ import { KnowledgeGraph } from "../memory/knowledge-graph.js";
 import { SocialMediaInvestigator } from "../processing/social-investigator.js";
 import { SceneAnalyzer } from "../processing/scene-analyzer.js";
 import { AudioPipeline } from "../processing/audio-pipeline.js";
+import { SceneContextStore } from "../memory/scene-context-store.js";
 
 // ── Agent ────────────────────────────────────────────────────────
 
@@ -81,6 +83,7 @@ export class SecurityAgent {
   patternMiner: PatternMiner | null = null;
   hypothesisEngine: HypothesisEngine | null = null;
   sceneAnalyzer: SceneAnalyzer | null = null;
+  sceneContextStore: SceneContextStore | null = null;
   socialInvestigator: SocialMediaInvestigator | null = null;
   socialPredictor: SocialPredictionEngine | null = null;
   queryManager: QueryManager | null = null;
@@ -159,6 +162,8 @@ export class SecurityAgent {
       this.bus,
       this.config.vigia.sceneAnalyzer,
     );
+    this.sceneContextStore = new SceneContextStore();
+    this.memory.sceneContextStore = this.sceneContextStore;
     this.behaviorMatcher = new BehavioralPatternMatcher();
     this.queryManager = new QueryManager(this.bus);
     this.knowledgeGraph = new KnowledgeGraph();
@@ -237,6 +242,32 @@ export class SecurityAgent {
       const answer = (data.answer as string) || "";
       void this.handleUserFeedback(answer);
     });
+
+    // Scene observation handler — persiste no SceneIndex + atualiza contexto
+    this.bus.subscribe("scene.observation", (_topic, payload) => {
+      const obs = payload as unknown as SceneObservation;
+      if (obs && this.memory) {
+        void this.memory.sceneIndex.store(obs);
+        void this.sceneContextStore?.ingest(obs);
+
+        const anomaly = this.sceneContextStore?.detectAnomaly(obs);
+        if (anomaly?.isAnomaly) {
+          this.bus.publish("scene.anomaly", {
+            cameraId: obs.cameraId,
+            reason: anomaly.reason,
+            narration: obs.description.narration.slice(0, 120),
+          });
+        }
+      }
+    });
+
+    // Bootstrap scene context from past observations
+    if (this.sceneContextStore && this.memory?.sceneIndex) {
+      const cameraIds = this.config.cameras
+        .filter((c) => c.enabled)
+        .map((c) => c.id);
+      await this.sceneContextStore.bootstrap(this.memory.sceneIndex, cameraIds);
+    }
 
     // Inicia streams de câmera
     const cameraTasks = this.cameras.map((camera) =>
